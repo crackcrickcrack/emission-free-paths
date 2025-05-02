@@ -26,7 +26,7 @@ interface MapProps {
 }
 
 // Component to update the map view when center changes
-function ChangeMapView({ center }: { center: [number, number] }) {
+function SetMapView({ center }: { center: [number, number] }) {
   const map = useMap();
   
   useEffect(() => {
@@ -36,8 +36,8 @@ function ChangeMapView({ center }: { center: [number, number] }) {
   return null;
 }
 
-// Component to handle routes
-function RouteManager({ 
+// Component to handle route rendering
+function RouteLines({ 
   routes, 
   selectedRouteId 
 }: { 
@@ -52,19 +52,24 @@ function RouteManager({
   const routeLayersRef = useRef<L.LayerGroup | null>(null);
   
   useEffect(() => {
-    // Clear previous routes
-    if (routeLayersRef.current) {
-      routeLayersRef.current.clearLayers();
-    } else {
+    // Initialize layer group if not already done
+    if (!routeLayersRef.current) {
       routeLayersRef.current = L.layerGroup().addTo(map);
     }
     
-    // Draw routes
+    // Clear previous routes
+    routeLayersRef.current.clearLayers();
+    
+    // Draw routes if available
     if (routes && routes.length > 0) {
+      const allCoordinates: [number, number][] = [];
+      
       routes.forEach((route) => {
-        // Check if route has coordinates
         if (route.coordinates && route.coordinates.length > 0) {
           const isSelected = route.id === selectedRouteId;
+          
+          // Add coordinates to collection for bounds calculation
+          allCoordinates.push(...route.coordinates);
           
           // Create polyline for the route
           const routeLine = L.polyline(route.coordinates, {
@@ -77,7 +82,7 @@ function RouteManager({
           // Add hover effect
           routeLine.on('mouseover', function() {
             if (!isSelected) {
-              this.setStyle({
+              routeLine.setStyle({
                 weight: 4,
                 opacity: 0.9
               });
@@ -86,41 +91,29 @@ function RouteManager({
           
           routeLine.on('mouseout', function() {
             if (!isSelected) {
-              this.setStyle({
+              routeLine.setStyle({
                 weight: 3,
                 opacity: 0.7
               });
             }
           });
           
-          // Add the polyline to the layer
+          // Add the polyline to the layer group
           if (routeLayersRef.current) {
             routeLine.addTo(routeLayersRef.current);
           }
-          
-          // Set bounds to fit all routes
-          if (routes.length === 1) {
-            map.fitBounds(routeLine.getBounds(), {
-              padding: [50, 50]
-            });
-          }
         }
       });
-
-      // Set bounds to fit all routes if multiple routes
-      if (routes.length > 1) {
-        const allCoordinates = routes.flatMap(r => r.coordinates || []);
-        if (allCoordinates.length > 0) {
-          const bounds = L.latLngBounds(allCoordinates);
-          if (bounds.isValid()) {
-            map.fitBounds(bounds, {
-              padding: [50, 50]
-            });
-          }
+      
+      // Adjust map view to fit all routes
+      if (allCoordinates.length > 0) {
+        const bounds = L.latLngBounds(allCoordinates);
+        if (bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [50, 50] });
         }
       }
     }
-
+    
     return () => {
       if (routeLayersRef.current) {
         routeLayersRef.current.clearLayers();
@@ -131,7 +124,7 @@ function RouteManager({
   return null;
 }
 
-// Main Map component
+// Main Map component that sets up the MapContainer
 const Map: React.FC<MapProps> = ({
   center,
   routes = [],
@@ -142,26 +135,30 @@ const Map: React.FC<MapProps> = ({
   console.log("Map rendering with center:", center);
 
   return (
-    <div className="map-container h-full">
+    <div className="h-full w-full">
       <MapContainer 
         center={center} 
         zoom={12} 
-        className="h-full w-full"
+        style={{ height: '100%', width: '100%' }}
+        whenCreated={() => {}}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        <ChangeMapView center={center} />
-        <RouteManager routes={routes} selectedRouteId={selectedRouteId} />
+        <SetMapView center={center} />
         
-        {/* Markers for start and end points */}
+        {routes && routes.length > 0 && (
+          <RouteLines routes={routes} selectedRouteId={selectedRouteId} />
+        )}
+        
         {startCoords && (
           <Marker position={startCoords}>
             <Popup>Starting Point</Popup>
           </Marker>
         )}
+        
         {endCoords && (
           <Marker position={endCoords}>
             <Popup>Destination</Popup>
