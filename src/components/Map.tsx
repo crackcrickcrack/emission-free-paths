@@ -26,7 +26,7 @@ interface MapProps {
 }
 
 // Component to update the map view when center changes
-function MapViewUpdater({ center }: { center: [number, number] }) {
+const MapViewUpdater = ({ center }: { center: [number, number] }) => {
   const map = useMap();
   
   React.useEffect(() => {
@@ -34,10 +34,10 @@ function MapViewUpdater({ center }: { center: [number, number] }) {
   }, [center, map]);
   
   return null;
-}
+};
 
 // Component to handle route rendering
-function RouteLinesLayer({ 
+const RouteLinesLayer = ({ 
   routes, 
   selectedRouteId 
 }: { 
@@ -47,7 +47,7 @@ function RouteLinesLayer({
     transportMode?: string;
   }>;
   selectedRouteId?: string;
-}) {
+}) => {
   const map = useMap();
   
   React.useEffect(() => {
@@ -121,7 +121,7 @@ function RouteLinesLayer({
   }, [routes, selectedRouteId, map]);
 
   return null;
-}
+};
 
 // Main Map component
 const Map: React.FC<MapProps> = ({
@@ -149,7 +149,6 @@ const Map: React.FC<MapProps> = ({
           <RouteLinesLayer routes={routes} selectedRouteId={selectedRouteId} />
         )}
         
-        {/* Render markers as direct elements, not in a component */}
         {startCoords && (
           <Marker position={startCoords}>
             <Popup>Starting Point</Popup>
