@@ -148,8 +148,8 @@ const Map = ({
         center={center} 
         zoom={12} 
         className="h-full w-full"
-        whenCreated={(mapInstance) => {
-          mapRef.current = mapInstance;
+        whenReady={(map) => {
+          mapRef.current = map.target;
           console.log("Map ready");
         }}
       >
