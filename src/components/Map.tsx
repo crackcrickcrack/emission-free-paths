@@ -132,22 +132,16 @@ const RouteLayer = ({
   return null;
 };
 
-// This component renders the internal map contents using the Leaflet context
-const MapContents = ({
-  center,
-  routes = [],
+// This component renders the markers for start and end points
+const MapMarkers = ({
   startCoords,
-  endCoords,
-  selectedRouteId
-}: MapProps) => {
+  endCoords
+}: {
+  startCoords?: [number, number];
+  endCoords?: [number, number];
+}) => {
   return (
     <>
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      <ChangeMapView center={center} />
-      <RouteLayer routes={routes} selectedRouteId={selectedRouteId} />
       {startCoords && (
         <Marker position={startCoords}>
           <Popup>Starting Point</Popup>
@@ -180,13 +174,13 @@ const Map = ({
           console.log("Map ready");
         }}
       >
-        <MapContents
-          center={center}
-          routes={routes}
-          startCoords={startCoords}
-          endCoords={endCoords}
-          selectedRouteId={selectedRouteId}
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        <ChangeMapView center={center} />
+        <RouteLayer routes={routes} selectedRouteId={selectedRouteId} />
+        <MapMarkers startCoords={startCoords} endCoords={endCoords} />
       </MapContainer>
     </div>
   );
