@@ -5,20 +5,12 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet marker icon issue
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
   iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png'
 });
-
-interface MapProps {
-  center: [number, number];
-  routes: any[];
-  startCoords?: [number, number];
-  endCoords?: [number, number];
-  selectedRouteId?: string;
-}
 
 // Component to update the map view when center changes
 const ChangeMapView = ({ center }: { center: [number, number] }) => {
@@ -35,10 +27,10 @@ const RouteLayer = ({
   selectedRouteId 
 }: { 
   routes: any[]; 
-  selectedRouteId?: string;
+  selectedRouteId?: string 
 }) => {
   const map = useMap();
-  const routeLayerRef = useRef<any>(null);
+  const routeLayerRef = useRef<L.LayerGroup | null>(null);
 
   useEffect(() => {
     // Clear previous routes
@@ -60,7 +52,7 @@ const RouteLayer = ({
             color: isSelected ? '#15803d' : '#4ade80',
             weight: isSelected ? 5 : 3,
             opacity: isSelected ? 1 : 0.7,
-            dashArray: route.transportMode === 'transit' ? '5, 5' : '',
+            dashArray: route.transportMode === 'transit' ? '5, 5' : ''
           }).addTo(routeLayer);
           
           // Add hover effect
@@ -81,10 +73,12 @@ const RouteLayer = ({
               });
             }
           });
-
+          
           // Set bounds to fit all routes
           if (routes.length === 1) {
-            map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+            map.fitBounds(routeLine.getBounds(), {
+              padding: [50, 50]
+            });
           }
         }
       });
@@ -96,7 +90,9 @@ const RouteLayer = ({
       if (routes.length > 1) {
         const bounds = L.latLngBounds(routes.flatMap(r => r.coordinates || []));
         if (bounds.isValid()) {
-          map.fitBounds(bounds, { padding: [50, 50] });
+          map.fitBounds(bounds, {
+            padding: [50, 50]
+          });
         }
       }
     }
@@ -111,35 +107,29 @@ const RouteLayer = ({
   return null;
 };
 
-const Map: React.FC<MapProps> = ({ 
-  center, 
-  routes, 
-  startCoords, 
-  endCoords,
-  selectedRouteId
-}) => {
+interface MapProps {
+  center: [number, number];
+  routes: any[];
+  startCoords?: [number, number];
+  endCoords?: [number, number];
+  selectedRouteId?: string;
+}
+
+const Map: React.FC<MapProps> = ({ center, routes, startCoords, endCoords, selectedRouteId }) => {
   return (
     <div className="map-container h-full">
-      <MapContainer
-        center={center}
-        zoom={12}
-        className="h-full w-full"
-      >
+      <MapContainer center={center} zoom={12} className="h-full w-full">
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        
         <ChangeMapView center={center} />
-        
         <RouteLayer routes={routes} selectedRouteId={selectedRouteId} />
-        
         {startCoords && (
           <Marker position={startCoords}>
             <Popup>Starting Point</Popup>
           </Marker>
         )}
-        
         {endCoords && (
           <Marker position={endCoords}>
             <Popup>Destination</Popup>
