@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -26,10 +26,10 @@ interface MapProps {
 }
 
 // Component to update the map view when center changes
-function MapViewCenter({ center }: { center: [number, number] }) {
+function MapViewUpdater({ center }: { center: [number, number] }) {
   const map = useMap();
   
-  useEffect(() => {
+  React.useEffect(() => {
     map.setView(center, map.getZoom());
   }, [center, map]);
   
@@ -37,7 +37,7 @@ function MapViewCenter({ center }: { center: [number, number] }) {
 }
 
 // Component to handle route rendering
-function RouteLines({ 
+function RouteLinesLayer({ 
   routes, 
   selectedRouteId 
 }: { 
@@ -50,7 +50,7 @@ function RouteLines({
 }) {
   const map = useMap();
   
-  useEffect(() => {
+  React.useEffect(() => {
     // Clear any existing polylines
     map.eachLayer((layer) => {
       if (layer instanceof L.Polyline) {
@@ -123,33 +123,14 @@ function RouteLines({
   return null;
 }
 
-// Component to render markers
-function MarkerElements({ startCoords, endCoords }: { startCoords?: [number, number], endCoords?: [number, number] }) {
-  return (
-    <>
-      {startCoords && (
-        <Marker position={startCoords}>
-          <Popup>Starting Point</Popup>
-        </Marker>
-      )}
-      
-      {endCoords && (
-        <Marker position={endCoords}>
-          <Popup>Destination</Popup>
-        </Marker>
-      )}
-    </>
-  );
-}
-
 // Main Map component
-const Map = ({
+const Map: React.FC<MapProps> = ({
   center,
   routes = [],
   startCoords,
   endCoords,
   selectedRouteId
-}: MapProps) => {
+}) => {
   return (
     <div className="h-full w-full">
       <MapContainer 
@@ -162,19 +143,24 @@ const Map = ({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        <MapViewCenter center={center} />
+        <MapViewUpdater center={center} />
         
-        {routes.length > 0 && (
-          <RouteLines 
-            routes={routes} 
-            selectedRouteId={selectedRouteId} 
-          />
+        {routes && routes.length > 0 && (
+          <RouteLinesLayer routes={routes} selectedRouteId={selectedRouteId} />
         )}
         
-        <MarkerElements
-          startCoords={startCoords}
-          endCoords={endCoords}
-        />
+        {/* Render markers as direct elements, not in a component */}
+        {startCoords && (
+          <Marker position={startCoords}>
+            <Popup>Starting Point</Popup>
+          </Marker>
+        )}
+        
+        {endCoords && (
+          <Marker position={endCoords}>
+            <Popup>Destination</Popup>
+          </Marker>
+        )}
       </MapContainer>
     </div>
   );
