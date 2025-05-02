@@ -26,7 +26,7 @@ interface MapProps {
 }
 
 // Component to update the map view when center changes
-function ChangeView({ center }: { center: [number, number] }) {
+const MapViewCenter = ({ center }: { center: [number, number] }) => {
   const map = useMap();
   
   useEffect(() => {
@@ -34,10 +34,10 @@ function ChangeView({ center }: { center: [number, number] }) {
   }, [center, map]);
   
   return null;
-}
+};
 
 // Component to handle route rendering
-function RouteLines({ 
+const RouteLines = ({ 
   routes, 
   selectedRouteId 
 }: { 
@@ -47,11 +47,11 @@ function RouteLines({
     transportMode?: string;
   }>;
   selectedRouteId?: string;
-}) {
+}) => {
   const map = useMap();
   
   useEffect(() => {
-    // Clear any existing layers that we might have added
+    // Clear any existing polylines
     map.eachLayer((layer) => {
       if (layer instanceof L.Polyline) {
         map.removeLayer(layer);
@@ -121,9 +121,28 @@ function RouteLines({
   }, [routes, selectedRouteId, map]);
 
   return null;
-}
+};
 
-// Main Map component that sets up the MapContainer
+// Component to render markers
+const MapMarkers = ({ startCoords, endCoords }: { startCoords?: [number, number], endCoords?: [number, number] }) => {
+  return (
+    <>
+      {startCoords && (
+        <Marker position={startCoords}>
+          <Popup>Starting Point</Popup>
+        </Marker>
+      )}
+      
+      {endCoords && (
+        <Marker position={endCoords}>
+          <Popup>Destination</Popup>
+        </Marker>
+      )}
+    </>
+  );
+};
+
+// Main Map component
 const Map: React.FC<MapProps> = ({
   center,
   routes = [],
@@ -131,8 +150,6 @@ const Map: React.FC<MapProps> = ({
   endCoords,
   selectedRouteId
 }) => {
-  console.log("Map rendering with center:", center);
-
   return (
     <div className="h-full w-full">
       <MapContainer 
@@ -145,23 +162,19 @@ const Map: React.FC<MapProps> = ({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        <ChangeView center={center} />
+        <MapViewCenter center={center} />
         
         {routes && routes.length > 0 && (
-          <RouteLines routes={routes} selectedRouteId={selectedRouteId} />
+          <RouteLines 
+            routes={routes} 
+            selectedRouteId={selectedRouteId} 
+          />
         )}
         
-        {startCoords && (
-          <Marker position={startCoords}>
-            <Popup>Starting Point</Popup>
-          </Marker>
-        )}
-        
-        {endCoords && (
-          <Marker position={endCoords}>
-            <Popup>Destination</Popup>
-          </Marker>
-        )}
+        <MapMarkers 
+          startCoords={startCoords}
+          endCoords={endCoords}
+        />
       </MapContainer>
     </div>
   );
