@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
@@ -176,9 +175,9 @@ const Map = ({
         center={center} 
         zoom={12} 
         className="h-full w-full"
-        whenReady={(e) => {
+        whenReady={() => {
           // Optional: You can access the map instance here if needed
-          console.log("Map ready:", e.target);
+          console.log("Map ready");
         }}
       >
         <MapContents
