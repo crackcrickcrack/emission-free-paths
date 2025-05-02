@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet marker icon issue
@@ -25,39 +25,48 @@ interface MapProps {
   selectedRouteId?: string;
 }
 
-// Map view updater component
-function MapViewUpdater({ center }: { center: [number, number] }) {
-  const map = useMap();
+// Map component that avoids React context issues
+const Map: React.FC<MapProps> = ({
+  center,
+  routes = [],
+  startCoords,
+  endCoords,
+  selectedRouteId
+}) => {
+  const mapRef = useRef<L.Map | null>(null);
+  const routeLayersRef = useRef<L.Polyline[]>([]);
   
-  React.useEffect(() => {
-    map.setView(center, map.getZoom());
-  }, [center, map]);
+  // Function to handle map initialization
+  const onMapCreated = (map: L.Map) => {
+    mapRef.current = map;
+  };
   
-  return null;
-}
-
-// Component to render route lines
-function RouteLines({ routes, selectedRouteId }: { 
-  routes: Array<{ 
-    id: string; 
-    coordinates: [number, number][]; 
-    transportMode?: string 
-  }>;
-  selectedRouteId?: string 
-}) {
-  const map = useMap();
+  // Update map center when center prop changes
+  useEffect(() => {
+    if (mapRef.current) {
+      mapRef.current.setView(center, mapRef.current.getZoom());
+    }
+  }, [center]);
   
-  React.useEffect(() => {
-    if (!routes || routes.length === 0) return;
-
-    // Clear previous layers first
-    map.eachLayer((layer) => {
-      if (layer instanceof L.Polyline) {
+  // Handle routes rendering
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    
+    // Clean up existing route layers
+    routeLayersRef.current.forEach(layer => {
+      if (map.hasLayer(layer)) {
         map.removeLayer(layer);
       }
     });
     
-    // Add new polylines
+    routeLayersRef.current = [];
+    
+    if (!routes || routes.length === 0) return;
+    
+    // Add new route lines
+    const allCoordinates: [number, number][] = [];
+    
     routes.forEach(route => {
       const isSelected = route.id === selectedRouteId;
       
@@ -87,91 +96,48 @@ function RouteLines({ routes, selectedRouteId }: {
       });
       
       polyline.addTo(map);
+      routeLayersRef.current.push(polyline);
+      
+      if (route.coordinates && route.coordinates.length > 0) {
+        allCoordinates.push(...route.coordinates);
+      }
     });
     
-    // Fit bounds
-    if (routes && routes.length > 0) {
-      const allCoordinates: [number, number][] = [];
-      
-      routes.forEach(route => {
-        if (route.coordinates && route.coordinates.length > 0) {
-          allCoordinates.push(...route.coordinates);
-        }
-      });
-      
-      if (allCoordinates.length > 0) {
-        const bounds = L.latLngBounds(allCoordinates);
-        if (bounds.isValid()) {
-          map.fitBounds(bounds, { padding: [50, 50] });
-        }
+    // Fit bounds if we have coordinates
+    if (allCoordinates.length > 0) {
+      const bounds = L.latLngBounds(allCoordinates);
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [50, 50] });
       }
     }
     
-    return () => {
-      // Cleanup
-      map.eachLayer((layer) => {
-        if (layer instanceof L.Polyline) {
-          map.removeLayer(layer);
-        }
-      });
-    };
-  }, [routes, selectedRouteId, map]);
+  }, [routes, selectedRouteId]);
   
-  return null;
-}
-
-// Component to render markers
-function MapMarkers({ 
-  startCoords, 
-  endCoords 
-}: { 
-  startCoords?: [number, number]; 
-  endCoords?: [number, number]; 
-}) {
-  return (
-    <>
-      {startCoords && (
-        <Marker position={startCoords}>
-          <Popup>Starting Point</Popup>
-        </Marker>
-      )}
-      
-      {endCoords && (
-        <Marker position={endCoords}>
-          <Popup>Destination</Popup>
-        </Marker>
-      )}
-    </>
-  );
-}
-
-// Main Map component
-const Map: React.FC<MapProps> = ({
-  center,
-  routes = [],
-  startCoords,
-  endCoords,
-  selectedRouteId
-}) => {
   return (
     <div className="h-full w-full">
       <MapContainer 
         center={center} 
         zoom={12} 
         style={{ height: '100%', width: '100%' }}
+        ref={onMapCreated}
+        whenCreated={onMapCreated}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        <MapViewUpdater center={center} />
-        
-        {routes && routes.length > 0 && (
-          <RouteLines routes={routes} selectedRouteId={selectedRouteId} />
+        {startCoords && (
+          <Marker position={startCoords}>
+            <Popup>Starting Point</Popup>
+          </Marker>
         )}
         
-        <MapMarkers startCoords={startCoords} endCoords={endCoords} />
+        {endCoords && (
+          <Marker position={endCoords}>
+            <Popup>Destination</Popup>
+          </Marker>
+        )}
       </MapContainer>
     </div>
   );
