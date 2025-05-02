@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -122,35 +122,44 @@ const RouteLayer = ({
   return null;
 };
 
-const Map: React.FC<MapProps> = ({ center, routes, startCoords, endCoords, selectedRouteId }) => {
-  // Handle empty routes case to prevent rendering issues
-  const safeRoutes = routes || [];
-  
-  // Use React.useMemo to ensure components aren't unnecessarily re-rendered
-  const renderMap = React.useMemo(() => (
+const MapContent = ({ 
+  center, 
+  routes, 
+  startCoords, 
+  endCoords, 
+  selectedRouteId 
+}: MapProps) => {
+  return (
+    <>
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+      <ChangeMapView center={center} />
+      <RouteLayer routes={routes || []} selectedRouteId={selectedRouteId} />
+      {startCoords && (
+        <Marker position={startCoords}>
+          <Popup>Starting Point</Popup>
+        </Marker>
+      )}
+      {endCoords && (
+        <Marker position={endCoords}>
+          <Popup>Destination</Popup>
+        </Marker>
+      )}
+    </>
+  );
+};
+
+const Map: React.FC<MapProps> = (props) => {
+  // Separate the map container from the internal components that need context
+  return (
     <div className="map-container h-full">
-      <MapContainer center={center} zoom={12} className="h-full w-full">
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        <ChangeMapView center={center} />
-        <RouteLayer routes={safeRoutes} selectedRouteId={selectedRouteId} />
-        {startCoords && (
-          <Marker position={startCoords}>
-            <Popup>Starting Point</Popup>
-          </Marker>
-        )}
-        {endCoords && (
-          <Marker position={endCoords}>
-            <Popup>Destination</Popup>
-          </Marker>
-        )}
+      <MapContainer center={props.center} zoom={12} className="h-full w-full">
+        <MapContent {...props} />
       </MapContainer>
     </div>
-  ), [center, safeRoutes, startCoords, endCoords, selectedRouteId]);
-  
-  return renderMap;
+  );
 };
 
 export default Map;
