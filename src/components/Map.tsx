@@ -43,7 +43,7 @@ const RouteManager: React.FC<{
     coordinates: [number, number][];
     transportMode?: string;
   }>;
-  selectedRouteId?: string 
+  selectedRouteId?: string;
 }> = ({ routes, selectedRouteId }) => {
   const map = useMap();
   const routeLayersRef = useRef<L.LayerGroup | null>(null);
@@ -136,7 +136,6 @@ const Map: React.FC<MapProps> = ({
   endCoords,
   selectedRouteId
 }) => {
-  // Log to confirm component renders correctly
   console.log("Map rendering with center:", center);
 
   return (
@@ -145,7 +144,6 @@ const Map: React.FC<MapProps> = ({
         center={center} 
         zoom={12} 
         className="h-full w-full"
-        whenReady={() => console.log("Map ready")}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
