@@ -1,5 +1,9 @@
 // Mock route service - in production this would connect to a real routing API
 
+// API configuration
+const API_KEY = import.meta.env.VITE_OPENROUTE_API_KEY;
+const API_BASE_URL = 'https://api.openrouteservice.org/v2';
+
 // Helper function to generate random coordinates around a center point
 const generateRandomCoordinates = (
   center: [number, number], 
@@ -35,7 +39,7 @@ const createRoutePath = (
   return result;
 };
 
-// Calculate emissions based on transport mode and distance
+// Helper function to calculate emissions based on transport mode and distance
 const calculateEmissions = (transportMode: string, distance: number): number => {
   // Emissions in kg CO2 per km
   const emissionRates: Record<string, number> = {
@@ -153,32 +157,112 @@ const createRouteInstructions = (transportMode: string, pointCount: number) => {
   return result;
 };
 
-// Get routes between two points
+// Geocode a location using OpenRouteService Geocoding API
+export const geocodeLocation = async (location: string): Promise<[number, number]> => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(location)}`
+    );
+    
+    if (!response.ok) {
+      throw new Error('Geocoding failed');
+    }
+    
+    const data = await response.json();
+    if (!data.features || data.features.length === 0) {
+      throw new Error('Location not found');
+    }
+    
+    const [lng, lat] = data.features[0].geometry.coordinates;
+    return [lat, lng];
+  } catch (error) {
+    console.error('Geocoding error:', error);
+    throw error;
+  }
+};
+
+// Get routes between two points using OpenRouteService
 export const getRoutes = async (
   startLocation: string,
   endLocation: string,
   transportMode?: string
 ): Promise<any[]> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  // Mock coordinates
-  // In a real implementation, we would geocode the locations
-  const startCoords: [number, number] = [51.505, -0.09]; // London
-  const endCoords: [number, number] = [51.52, -0.12]; // Near London
-  
-  // If transport mode is specified, return only that route
-  if (transportMode) {
-    return [createRoute(startCoords, endCoords, startLocation, endLocation, transportMode)];
+  try {
+    // Geocode both locations
+    const [startCoords, endCoords] = await Promise.all([
+      geocodeLocation(startLocation),
+      geocodeLocation(endLocation)
+    ]);
+
+    // Define available transport modes
+    const modes = transportMode ? [transportMode] : ['driving', 'transit', 'cycling', 'walking'];
+    
+    // Get routes for each transport mode
+    const routePromises = modes.map(async (mode) => {
+      const profile = {
+        driving: 'driving-car',
+        transit: 'driving-car', // OpenRouteService doesn't support transit, using driving as fallback
+        cycling: 'cycling-regular',
+        walking: 'foot-walking'
+      }[mode];
+
+      const response = await fetch(
+        `${API_BASE_URL}/directions/${profile}?api_key=${API_KEY}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8'
+          },
+          body: JSON.stringify({
+            coordinates: [
+              [startCoords[1], startCoords[0]], // OpenRouteService expects [lng, lat]
+              [endCoords[1], endCoords[0]]
+            ],
+            format: 'geojson'
+          })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to get route for ${mode}`);
+      }
+
+      const data = await response.json();
+      
+      // Extract route information
+      const route = data.features[0];
+      const distance = route.properties.segments[0].distance;
+      const duration = route.properties.segments[0].duration / 60; // Convert to minutes
+      const coordinates = route.geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng]);
+      
+      // Calculate emissions
+      const emissions = calculateEmissions(mode, distance);
+      
+      return {
+        id: `${mode}-${Math.random().toString(36).substring(2, 9)}`,
+        transportMode: mode,
+        distance,
+        duration,
+        emissions,
+        coordinates,
+        startLocation,
+        endLocation,
+        startCoords,
+        endCoords,
+        steps: route.properties.segments[0].steps.map((step: any) => ({
+          instruction: step.instruction,
+          distance: step.distance,
+          duration: step.duration / 60 // Convert to minutes
+        }))
+      };
+    });
+
+    return await Promise.all(routePromises);
+  } catch (error) {
+    console.error('Error getting routes:', error);
+    throw error;
   }
-  
-  // Otherwise return all transport modes
-  return [
-    createRoute(startCoords, endCoords, startLocation, endLocation, 'driving'),
-    createRoute(startCoords, endCoords, startLocation, endLocation, 'transit'),
-    createRoute(startCoords, endCoords, startLocation, endLocation, 'cycling'),
-    createRoute(startCoords, endCoords, startLocation, endLocation, 'walking')
-  ];
 };
 
 // Create a single route
@@ -251,14 +335,4 @@ const createRoute = (
     steps,
     isEcoFriendly: transportMode === 'cycling' || transportMode === 'walking'
   };
-};
-
-// Get the geocoded coordinates from a location string
-export const geocodeLocation = async (location: string): Promise<[number, number]> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  // Mock geocoding - in production this would use a geocoding service
-  // Return random coordinates near London
-  return [51.505 + (Math.random() - 0.5) * 0.05, -0.09 + (Math.random() - 0.5) * 0.05];
 };

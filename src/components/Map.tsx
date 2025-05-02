@@ -1,8 +1,9 @@
-
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, Component, ReactNode } from 'react';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2 } from 'lucide-react';
 
 // Fix Leaflet marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -25,12 +26,58 @@ interface MapProps {
   selectedRouteId?: string;
 }
 
-// Component to handle map controller functionality
-const MapController: React.FC<{
+interface MapControllerProps {
   center: [number, number];
   routes: MapProps['routes'];
   selectedRouteId?: string;
-}> = ({ center, routes, selectedRouteId }) => {
+}
+
+// Error boundary component
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class MapErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-full w-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+          <Alert variant="destructive" className="max-w-md">
+            <AlertDescription>
+              Failed to load map: {this.state.error?.message}
+            </AlertDescription>
+          </Alert>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// Loading component
+const MapLoading = () => (
+  <div className="h-full w-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+    <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+  </div>
+);
+
+// Component to handle map controller functionality
+const MapController: React.FC<MapControllerProps> = ({ center, routes, selectedRouteId }) => {
   const map = useMap();
   const routeLayersRef = useRef<L.Polyline[]>([]);
   
@@ -120,33 +167,63 @@ const Map: React.FC<MapProps> = ({
   endCoords,
   selectedRouteId
 }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000); // Give map time to initialize
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (error) {
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertDescription>
+            Failed to load map: {error.message}
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return <MapLoading />;
+  }
+
   return (
-    <div className="h-full w-full">
-      <MapContainer 
-        center={center} 
-        zoom={12} 
-        style={{ height: '100%', width: '100%' }}
-      >
-        <MapController center={center} routes={routes} selectedRouteId={selectedRouteId} />
-        
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        
-        {startCoords && (
-          <Marker position={startCoords}>
-            <Popup>Starting Point</Popup>
-          </Marker>
-        )}
-        
-        {endCoords && (
-          <Marker position={endCoords}>
-            <Popup>Destination</Popup>
-          </Marker>
-        )}
-      </MapContainer>
-    </div>
+    <MapErrorBoundary>
+      <div className="h-full w-full">
+        <MapContainer 
+          center={center} 
+          zoom={12} 
+          style={{ height: '100%', width: '100%' }}
+          whenReady={() => setIsLoading(false)}
+        >
+          <MapController center={center} routes={routes} selectedRouteId={selectedRouteId} />
+          
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          
+          {startCoords && (
+            <Marker position={startCoords}>
+              <Popup>Starting Point</Popup>
+            </Marker>
+          )}
+          
+          {endCoords && (
+            <Marker position={endCoords}>
+              <Popup>Destination</Popup>
+            </Marker>
+          )}
+        </MapContainer>
+      </div>
+    </MapErrorBoundary>
   );
 };
 
