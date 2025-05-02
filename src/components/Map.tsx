@@ -176,9 +176,9 @@ const Map = ({
         center={center} 
         zoom={12} 
         className="h-full w-full"
-        whenCreated={(map) => {
+        whenReady={(e) => {
           // Optional: You can access the map instance here if needed
-          console.log("Map created:", map);
+          console.log("Map ready:", e.target);
         }}
       >
         <MapContents
