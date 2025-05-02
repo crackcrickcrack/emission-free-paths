@@ -26,7 +26,7 @@ interface MapProps {
 }
 
 // Component to update the map view when center changes
-const MapViewCenter = ({ center }: { center: [number, number] }) => {
+function MapViewCenter({ center }: { center: [number, number] }) {
   const map = useMap();
   
   useEffect(() => {
@@ -34,10 +34,10 @@ const MapViewCenter = ({ center }: { center: [number, number] }) => {
   }, [center, map]);
   
   return null;
-};
+}
 
 // Component to handle route rendering
-const RouteLines = ({ 
+function RouteLines({ 
   routes, 
   selectedRouteId 
 }: { 
@@ -47,7 +47,7 @@ const RouteLines = ({
     transportMode?: string;
   }>;
   selectedRouteId?: string;
-}) => {
+}) {
   const map = useMap();
   
   useEffect(() => {
@@ -121,10 +121,10 @@ const RouteLines = ({
   }, [routes, selectedRouteId, map]);
 
   return null;
-};
+}
 
 // Component to render markers
-const MapMarkers = ({ startCoords, endCoords }: { startCoords?: [number, number], endCoords?: [number, number] }) => {
+function MarkerElements({ startCoords, endCoords }: { startCoords?: [number, number], endCoords?: [number, number] }) {
   return (
     <>
       {startCoords && (
@@ -140,16 +140,16 @@ const MapMarkers = ({ startCoords, endCoords }: { startCoords?: [number, number]
       )}
     </>
   );
-};
+}
 
 // Main Map component
-const Map: React.FC<MapProps> = ({
+const Map = ({
   center,
   routes = [],
   startCoords,
   endCoords,
   selectedRouteId
-}) => {
+}: MapProps) => {
   return (
     <div className="h-full w-full">
       <MapContainer 
@@ -164,14 +164,14 @@ const Map: React.FC<MapProps> = ({
         
         <MapViewCenter center={center} />
         
-        {routes && routes.length > 0 && (
+        {routes.length > 0 && (
           <RouteLines 
             routes={routes} 
             selectedRouteId={selectedRouteId} 
           />
         )}
         
-        <MapMarkers 
+        <MarkerElements
           startCoords={startCoords}
           endCoords={endCoords}
         />
