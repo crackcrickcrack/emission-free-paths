@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -26,7 +26,7 @@ interface MapProps {
 }
 
 // Component to update the map view when center changes
-function MapViewUpdater({ center }: { center: [number, number] }) {
+function ChangeView({ center }: { center: [number, number] }) {
   const map = useMap();
   
   useEffect(() => {
@@ -37,11 +37,11 @@ function MapViewUpdater({ center }: { center: [number, number] }) {
 }
 
 // Component to handle route rendering
-function RouteManager({ 
+function RouteLines({ 
   routes, 
   selectedRouteId 
 }: { 
-  routes?: Array<{
+  routes: Array<{
     id: string;
     coordinates: [number, number][];
     transportMode?: string;
@@ -49,16 +49,14 @@ function RouteManager({
   selectedRouteId?: string;
 }) {
   const map = useMap();
-  const routeLayersRef = useRef<L.LayerGroup | null>(null);
   
   useEffect(() => {
-    // Initialize layer group if not already done
-    if (!routeLayersRef.current) {
-      routeLayersRef.current = L.layerGroup().addTo(map);
-    }
-    
-    // Clear previous routes
-    routeLayersRef.current.clearLayers();
+    // Clear any existing layers that we might have added
+    map.eachLayer((layer) => {
+      if (layer instanceof L.Polyline) {
+        map.removeLayer(layer);
+      }
+    });
     
     // Draw routes if available
     if (routes && routes.length > 0) {
@@ -98,10 +96,8 @@ function RouteManager({
             }
           });
           
-          // Add the polyline to the layer group
-          if (routeLayersRef.current) {
-            routeLine.addTo(routeLayersRef.current);
-          }
+          // Add the polyline to the map
+          routeLine.addTo(map);
         }
       });
       
@@ -114,10 +110,13 @@ function RouteManager({
       }
     }
     
+    // Cleanup function
     return () => {
-      if (routeLayersRef.current) {
-        routeLayersRef.current.clearLayers();
-      }
+      map.eachLayer((layer) => {
+        if (layer instanceof L.Polyline) {
+          map.removeLayer(layer);
+        }
+      });
     };
   }, [routes, selectedRouteId, map]);
 
@@ -146,10 +145,10 @@ const Map: React.FC<MapProps> = ({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        <MapViewUpdater center={center} />
+        <ChangeView center={center} />
         
         {routes && routes.length > 0 && (
-          <RouteManager routes={routes} selectedRouteId={selectedRouteId} />
+          <RouteLines routes={routes} selectedRouteId={selectedRouteId} />
         )}
         
         {startCoords && (
