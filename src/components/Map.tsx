@@ -25,8 +25,8 @@ interface MapProps {
   selectedRouteId?: string;
 }
 
-// Component to update the map view when center changes
-const MapViewUpdater = ({ center }: { center: [number, number] }) => {
+// Map view updater as a function component
+const MapViewUpdater: React.FC<{ center: [number, number] }> = ({ center }) => {
   const map = useMap();
   
   React.useEffect(() => {
@@ -36,18 +36,15 @@ const MapViewUpdater = ({ center }: { center: [number, number] }) => {
   return null;
 };
 
-// Component to handle route rendering
-const RouteLinesLayer = ({ 
-  routes, 
-  selectedRouteId 
-}: { 
+// Route lines layer as a function component
+const RouteLinesLayer: React.FC<{ 
   routes: Array<{
     id: string;
     coordinates: [number, number][];
     transportMode?: string;
   }>;
   selectedRouteId?: string;
-}) => {
+}> = ({ routes, selectedRouteId }) => {
   const map = useMap();
   
   React.useEffect(() => {
@@ -123,6 +120,28 @@ const RouteLinesLayer = ({
   return null;
 };
 
+// Markers component as a function component
+const MapMarkers: React.FC<{
+  startCoords?: [number, number];
+  endCoords?: [number, number];
+}> = ({ startCoords, endCoords }) => {
+  return (
+    <>
+      {startCoords && (
+        <Marker position={startCoords}>
+          <Popup>Starting Point</Popup>
+        </Marker>
+      )}
+      
+      {endCoords && (
+        <Marker position={endCoords}>
+          <Popup>Destination</Popup>
+        </Marker>
+      )}
+    </>
+  );
+};
+
 // Main Map component
 const Map: React.FC<MapProps> = ({
   center,
@@ -149,17 +168,7 @@ const Map: React.FC<MapProps> = ({
           <RouteLinesLayer routes={routes} selectedRouteId={selectedRouteId} />
         )}
         
-        {startCoords && (
-          <Marker position={startCoords}>
-            <Popup>Starting Point</Popup>
-          </Marker>
-        )}
-        
-        {endCoords && (
-          <Marker position={endCoords}>
-            <Popup>Destination</Popup>
-          </Marker>
-        )}
+        <MapMarkers startCoords={startCoords} endCoords={endCoords} />
       </MapContainer>
     </div>
   );
