@@ -122,13 +122,15 @@ const RouteLayer = ({
   return null;
 };
 
-const MapContent = ({ 
+// This component is rendered directly as a child of MapContainer and
+// uses the context provided by MapContainer correctly
+function MapContent({ 
   center, 
-  routes, 
+  routes = [], 
   startCoords, 
   endCoords, 
   selectedRouteId 
-}: MapProps) => {
+}: MapProps) {
   return (
     <>
       <TileLayer
@@ -136,7 +138,7 @@ const MapContent = ({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <ChangeMapView center={center} />
-      <RouteLayer routes={routes || []} selectedRouteId={selectedRouteId} />
+      <RouteLayer routes={routes} selectedRouteId={selectedRouteId} />
       {startCoords && (
         <Marker position={startCoords}>
           <Popup>Starting Point</Popup>
@@ -149,14 +151,26 @@ const MapContent = ({
       )}
     </>
   );
-};
+}
 
-const Map: React.FC<MapProps> = (props) => {
-  // Separate the map container from the internal components that need context
+// Main Map component
+const Map = ({ 
+  center,
+  routes = [],
+  startCoords,
+  endCoords,
+  selectedRouteId
+}: MapProps) => {
   return (
     <div className="map-container h-full">
-      <MapContainer center={props.center} zoom={12} className="h-full w-full">
-        <MapContent {...props} />
+      <MapContainer center={center} zoom={12} className="h-full w-full">
+        <MapContent
+          center={center}
+          routes={routes}
+          startCoords={startCoords}
+          endCoords={endCoords}
+          selectedRouteId={selectedRouteId}
+        />
       </MapContainer>
     </div>
   );
