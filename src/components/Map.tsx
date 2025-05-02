@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -26,7 +26,7 @@ interface MapProps {
 }
 
 // Component to update the map view when center changes
-const ChangeMapView = ({ center }: { center: [number, number] }) => {
+const ChangeMapView: React.FC<{ center: [number, number] }> = ({ center }) => {
   const map = useMap();
   
   useEffect(() => {
@@ -37,13 +37,10 @@ const ChangeMapView = ({ center }: { center: [number, number] }) => {
 };
 
 // Component to handle routes
-const RouteManager = ({ 
-  routes, 
-  selectedRouteId 
-}: { 
-  routes: MapProps['routes'], 
+const RouteManager: React.FC<{ 
+  routes?: MapProps['routes'], 
   selectedRouteId?: string 
-}) => {
+}> = ({ routes, selectedRouteId }) => {
   const map = useMap();
   const routeLayersRef = useRef<L.LayerGroup | null>(null);
   
@@ -127,16 +124,21 @@ const RouteManager = ({
   return null;
 };
 
-// Main Map component
-const Map = ({
+// Our main Map component - using functional child components correctly
+const Map: React.FC<MapProps> = ({
   center,
   routes = [],
   startCoords,
   endCoords,
   selectedRouteId
-}: MapProps) => {
-  // Log to confirm component renders correctly
+}) => {
+  // Make sure we're not rendering anything incorrectly
   console.log("Map rendering with center:", center);
+
+  // Define a simple function to call when map is ready
+  const handleMapReady = () => {
+    console.log("Map ready");
+  };
 
   return (
     <div className="map-container h-full">
@@ -144,14 +146,18 @@ const Map = ({
         center={center} 
         zoom={12} 
         className="h-full w-full"
-        whenReady={() => console.log("Map ready")}
+        whenCreated={handleMapReady}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        
+        {/* Properly encapsulated child components that use React context */}
         <ChangeMapView center={center} />
         <RouteManager routes={routes} selectedRouteId={selectedRouteId} />
+        
+        {/* Markers for start and end points */}
         {startCoords && (
           <Marker position={startCoords}>
             <Popup>Starting Point</Popup>
