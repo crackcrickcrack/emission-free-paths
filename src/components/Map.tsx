@@ -5,19 +5,34 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet marker icon issue
-delete L.Icon.Default.prototype._getIconUrl;
+delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
   iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png'
 });
 
+// Define interfaces
+interface MapProps {
+  center: [number, number];
+  routes: Array<{
+    id: string;
+    coordinates: [number, number][];
+    transportMode?: string;
+  }>;
+  startCoords?: [number, number];
+  endCoords?: [number, number];
+  selectedRouteId?: string;
+}
+
 // Component to update the map view when center changes
 const ChangeMapView = ({ center }: { center: [number, number] }) => {
   const map = useMap();
+  
   useEffect(() => {
     map.setView(center, map.getZoom());
   }, [center, map]);
+  
   return null;
 };
 
@@ -26,7 +41,7 @@ const RouteLayer = ({
   routes, 
   selectedRouteId 
 }: { 
-  routes: any[]; 
+  routes: MapProps['routes']; 
   selectedRouteId?: string 
 }) => {
   const map = useMap();
@@ -107,16 +122,12 @@ const RouteLayer = ({
   return null;
 };
 
-interface MapProps {
-  center: [number, number];
-  routes: any[];
-  startCoords?: [number, number];
-  endCoords?: [number, number];
-  selectedRouteId?: string;
-}
-
 const Map: React.FC<MapProps> = ({ center, routes, startCoords, endCoords, selectedRouteId }) => {
-  return (
+  // Handle empty routes case to prevent rendering issues
+  const safeRoutes = routes || [];
+  
+  // Use React.useMemo to ensure components aren't unnecessarily re-rendered
+  const renderMap = React.useMemo(() => (
     <div className="map-container h-full">
       <MapContainer center={center} zoom={12} className="h-full w-full">
         <TileLayer
@@ -124,7 +135,7 @@ const Map: React.FC<MapProps> = ({ center, routes, startCoords, endCoords, selec
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <ChangeMapView center={center} />
-        <RouteLayer routes={routes} selectedRouteId={selectedRouteId} />
+        <RouteLayer routes={safeRoutes} selectedRouteId={selectedRouteId} />
         {startCoords && (
           <Marker position={startCoords}>
             <Popup>Starting Point</Popup>
@@ -137,7 +148,9 @@ const Map: React.FC<MapProps> = ({ center, routes, startCoords, endCoords, selec
         )}
       </MapContainer>
     </div>
-  );
+  ), [center, safeRoutes, startCoords, endCoords, selectedRouteId]);
+  
+  return renderMap;
 };
 
 export default Map;
