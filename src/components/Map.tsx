@@ -26,7 +26,7 @@ interface MapProps {
 }
 
 // Component to update the map view when center changes
-function SetMapView({ center }: { center: [number, number] }) {
+function MapViewUpdater({ center }: { center: [number, number] }) {
   const map = useMap();
   
   useEffect(() => {
@@ -37,7 +37,7 @@ function SetMapView({ center }: { center: [number, number] }) {
 }
 
 // Component to handle route rendering
-function RouteLines({ 
+function RouteManager({ 
   routes, 
   selectedRouteId 
 }: { 
@@ -140,17 +140,16 @@ const Map: React.FC<MapProps> = ({
         center={center} 
         zoom={12} 
         style={{ height: '100%', width: '100%' }}
-        whenCreated={() => {}}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        <SetMapView center={center} />
+        <MapViewUpdater center={center} />
         
         {routes && routes.length > 0 && (
-          <RouteLines routes={routes} selectedRouteId={selectedRouteId} />
+          <RouteManager routes={routes} selectedRouteId={selectedRouteId} />
         )}
         
         {startCoords && (
