@@ -26,7 +26,7 @@ interface MapProps {
 }
 
 // Component to update the map view when center changes
-const ChangeMapView: React.FC<{ center: [number, number] }> = ({ center }) => {
+function ChangeMapView({ center }: { center: [number, number] }) {
   const map = useMap();
   
   useEffect(() => {
@@ -34,17 +34,20 @@ const ChangeMapView: React.FC<{ center: [number, number] }> = ({ center }) => {
   }, [center, map]);
   
   return null;
-};
+}
 
 // Component to handle routes
-const RouteManager: React.FC<{ 
+function RouteManager({ 
+  routes, 
+  selectedRouteId 
+}: { 
   routes?: Array<{
     id: string;
     coordinates: [number, number][];
     transportMode?: string;
   }>;
   selectedRouteId?: string;
-}> = ({ routes, selectedRouteId }) => {
+}) {
   const map = useMap();
   const routeLayersRef = useRef<L.LayerGroup | null>(null);
   
@@ -126,7 +129,7 @@ const RouteManager: React.FC<{
   }, [routes, selectedRouteId, map]);
 
   return null;
-};
+}
 
 // Main Map component
 const Map: React.FC<MapProps> = ({
@@ -150,7 +153,6 @@ const Map: React.FC<MapProps> = ({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        {/* Map context consumers */}
         <ChangeMapView center={center} />
         <RouteManager routes={routes} selectedRouteId={selectedRouteId} />
         
