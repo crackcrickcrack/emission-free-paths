@@ -142,16 +142,20 @@ const Map = ({
     };
   }, [routes, selectedRouteId]);
 
+  // Function to set map reference after it's ready
+  const handleMapReady = React.useCallback(() => {
+    // The map instance will be accessed from the ref later
+    console.log("Map ready");
+  }, []);
+
   return (
     <div className="map-container h-full">
       <MapContainer 
         center={center} 
         zoom={12} 
         className="h-full w-full"
-        whenReady={(map) => {
-          mapRef.current = map.target;
-          console.log("Map ready");
-        }}
+        whenReady={handleMapReady}
+        ref={mapRef}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
