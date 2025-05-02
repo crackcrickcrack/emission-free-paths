@@ -1,7 +1,7 @@
 
 import React from 'react';
 import L from 'leaflet';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet marker icon issue
@@ -38,61 +38,58 @@ function MapViewUpdater({ center }: { center: [number, number] }) {
 
 // Component to render route lines
 function RouteLines({ routes, selectedRouteId }: { 
-  routes: { 
+  routes: Array<{ 
     id: string; 
     coordinates: [number, number][]; 
     transportMode?: string 
-  }[]; 
+  }>;
   selectedRouteId?: string 
 }) {
-  // Create polylines directly instead of using map.addLayer
-  return (
-    <>
-      {routes.map(route => {
-        const isSelected = route.id === selectedRouteId;
-        
-        return (
-          <Polyline
-            key={route.id}
-            positions={route.coordinates}
-            pathOptions={{
-              color: isSelected ? '#15803d' : '#4ade80',
-              weight: isSelected ? 5 : 3,
-              opacity: isSelected ? 1 : 0.7,
-              dashArray: route.transportMode === 'transit' ? '5, 5' : ''
-            }}
-            eventHandlers={{
-              mouseover: (e) => {
-                if (!isSelected) {
-                  const layer = e.target;
-                  layer.setStyle({
-                    weight: 4,
-                    opacity: 0.9
-                  });
-                }
-              },
-              mouseout: (e) => {
-                if (!isSelected) {
-                  const layer = e.target;
-                  layer.setStyle({
-                    weight: 3,
-                    opacity: 0.7
-                  });
-                }
-              }
-            }}
-          />
-        );
-      })}
-    </>
-  );
-}
-
-// Component to fit bounds to all routes
-function FitBoundsToRoutes({ routes }: { routes: { coordinates: [number, number][] }[] }) {
   const map = useMap();
   
   React.useEffect(() => {
+    if (!routes || routes.length === 0) return;
+
+    // Clear previous layers first
+    map.eachLayer((layer) => {
+      if (layer instanceof L.Polyline) {
+        map.removeLayer(layer);
+      }
+    });
+    
+    // Add new polylines
+    routes.forEach(route => {
+      const isSelected = route.id === selectedRouteId;
+      
+      const polyline = L.polyline(route.coordinates, {
+        color: isSelected ? '#15803d' : '#4ade80',
+        weight: isSelected ? 5 : 3,
+        opacity: isSelected ? 1 : 0.7,
+        dashArray: route.transportMode === 'transit' ? '5, 5' : ''
+      });
+      
+      polyline.on('mouseover', () => {
+        if (!isSelected) {
+          polyline.setStyle({
+            weight: 4,
+            opacity: 0.9
+          });
+        }
+      });
+      
+      polyline.on('mouseout', () => {
+        if (!isSelected) {
+          polyline.setStyle({
+            weight: 3,
+            opacity: 0.7
+          });
+        }
+      });
+      
+      polyline.addTo(map);
+    });
+    
+    // Fit bounds
     if (routes && routes.length > 0) {
       const allCoordinates: [number, number][] = [];
       
@@ -109,9 +106,43 @@ function FitBoundsToRoutes({ routes }: { routes: { coordinates: [number, number]
         }
       }
     }
-  }, [routes, map]);
+    
+    return () => {
+      // Cleanup
+      map.eachLayer((layer) => {
+        if (layer instanceof L.Polyline) {
+          map.removeLayer(layer);
+        }
+      });
+    };
+  }, [routes, selectedRouteId, map]);
   
   return null;
+}
+
+// Component to render markers
+function MapMarkers({ 
+  startCoords, 
+  endCoords 
+}: { 
+  startCoords?: [number, number]; 
+  endCoords?: [number, number]; 
+}) {
+  return (
+    <>
+      {startCoords && (
+        <Marker position={startCoords}>
+          <Popup>Starting Point</Popup>
+        </Marker>
+      )}
+      
+      {endCoords && (
+        <Marker position={endCoords}>
+          <Popup>Destination</Popup>
+        </Marker>
+      )}
+    </>
+  );
 }
 
 // Main Map component
@@ -137,23 +168,10 @@ const Map: React.FC<MapProps> = ({
         <MapViewUpdater center={center} />
         
         {routes && routes.length > 0 && (
-          <>
-            <RouteLines routes={routes} selectedRouteId={selectedRouteId} />
-            <FitBoundsToRoutes routes={routes} />
-          </>
+          <RouteLines routes={routes} selectedRouteId={selectedRouteId} />
         )}
         
-        {startCoords && (
-          <Marker position={startCoords}>
-            <Popup>Starting Point</Popup>
-          </Marker>
-        )}
-        
-        {endCoords && (
-          <Marker position={endCoords}>
-            <Popup>Destination</Popup>
-          </Marker>
-        )}
+        <MapMarkers startCoords={startCoords} endCoords={endCoords} />
       </MapContainer>
     </div>
   );
