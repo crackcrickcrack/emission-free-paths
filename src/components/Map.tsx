@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -26,34 +26,28 @@ interface MapProps {
 }
 
 // Component to update the map view when center changes
-// Correctly using the useMap hook as a proper functional component
 const ChangeMapView = ({ center }: { center: [number, number] }) => {
   const map = useMap();
   
-  React.useEffect(() => {
+  useEffect(() => {
     map.setView(center, map.getZoom());
   }, [center, map]);
   
   return null;
 };
 
-// Main Map component
-const Map = ({
-  center,
-  routes = [],
-  startCoords,
-  endCoords,
-  selectedRouteId
-}: MapProps) => {
-  // We'll manage route layers with refs and useEffect instead of custom components
-  const mapRef = React.useRef<L.Map | null>(null);
-  const routeLayersRef = React.useRef<L.LayerGroup | null>(null);
+// Component to handle routes
+const RouteManager = ({ 
+  routes, 
+  selectedRouteId 
+}: { 
+  routes: MapProps['routes'], 
+  selectedRouteId?: string 
+}) => {
+  const map = useMap();
+  const routeLayersRef = useRef<L.LayerGroup | null>(null);
   
-  // Effect for handling routes
-  React.useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    
+  useEffect(() => {
     // Clear previous routes
     if (routeLayersRef.current) {
       routeLayersRef.current.clearLayers();
@@ -128,13 +122,21 @@ const Map = ({
         routeLayersRef.current.clearLayers();
       }
     };
-  }, [routes, selectedRouteId]);
+  }, [routes, selectedRouteId, map]);
 
-  // Function to set map reference after it's ready
-  const handleMapReady = React.useCallback(() => {
-    // The map instance will be accessed from the ref later
-    console.log("Map ready");
-  }, []);
+  return null;
+};
+
+// Main Map component
+const Map = ({
+  center,
+  routes = [],
+  startCoords,
+  endCoords,
+  selectedRouteId
+}: MapProps) => {
+  // Log to confirm component renders correctly
+  console.log("Map rendering with center:", center);
 
   return (
     <div className="map-container h-full">
@@ -142,16 +144,14 @@ const Map = ({
         center={center} 
         zoom={12} 
         className="h-full w-full"
-        whenReady={handleMapReady}
-        ref={(mapInstance: L.Map | null) => {
-          mapRef.current = mapInstance;
-        }}
+        whenReady={() => console.log("Map ready")}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <ChangeMapView center={center} />
+        <RouteManager routes={routes} selectedRouteId={selectedRouteId} />
         {startCoords && (
           <Marker position={startCoords}>
             <Popup>Starting Point</Popup>
