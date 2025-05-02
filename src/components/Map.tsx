@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -15,7 +15,7 @@ L.Icon.Default.mergeOptions({
 // Define interfaces
 interface MapProps {
   center: [number, number];
-  routes: Array<{
+  routes?: Array<{
     id: string;
     coordinates: [number, number][];
     transportMode?: string;
@@ -38,7 +38,7 @@ const ChangeMapView = ({ center }: { center: [number, number] }) => {
 
 // Component to draw the route on the map
 const RouteLayer = ({ 
-  routes, 
+  routes = [], 
   selectedRouteId 
 }: { 
   routes: MapProps['routes']; 
@@ -50,13 +50,15 @@ const RouteLayer = ({
   useEffect(() => {
     // Clear previous routes
     if (routeLayerRef.current) {
+      routeLayerRef.current.clearLayers();
       map.removeLayer(routeLayerRef.current);
     }
 
+    // Create a new layer group
+    const routeLayer = L.layerGroup();
+
     // Draw routes
     if (routes && routes.length > 0) {
-      const routeLayer = L.layerGroup();
-
       routes.forEach((route) => {
         // Check if route has coordinates
         if (route.coordinates && route.coordinates.length > 0) {
@@ -68,7 +70,7 @@ const RouteLayer = ({
             weight: isSelected ? 5 : 3,
             opacity: isSelected ? 1 : 0.7,
             dashArray: route.transportMode === 'transit' ? '5, 5' : ''
-          }).addTo(routeLayer);
+          });
           
           // Add hover effect
           routeLine.on('mouseover', function() {
@@ -89,6 +91,9 @@ const RouteLayer = ({
             }
           });
           
+          // Add the polyline to the layer
+          routeLine.addTo(routeLayer);
+          
           // Set bounds to fit all routes
           if (routes.length === 1) {
             map.fitBounds(routeLine.getBounds(), {
@@ -98,22 +103,27 @@ const RouteLayer = ({
         }
       });
 
+      // Add the layer group to the map
       routeLayer.addTo(map);
       routeLayerRef.current = routeLayer;
 
       // Set bounds to fit all routes if multiple routes
       if (routes.length > 1) {
-        const bounds = L.latLngBounds(routes.flatMap(r => r.coordinates || []));
-        if (bounds.isValid()) {
-          map.fitBounds(bounds, {
-            padding: [50, 50]
-          });
+        const allCoordinates = routes.flatMap(r => r.coordinates || []);
+        if (allCoordinates.length > 0) {
+          const bounds = L.latLngBounds(allCoordinates);
+          if (bounds.isValid()) {
+            map.fitBounds(bounds, {
+              padding: [50, 50]
+            });
+          }
         }
       }
     }
 
     return () => {
       if (routeLayerRef.current) {
+        routeLayerRef.current.clearLayers();
         map.removeLayer(routeLayerRef.current);
       }
     };
@@ -122,15 +132,14 @@ const RouteLayer = ({
   return null;
 };
 
-// This component is rendered directly as a child of MapContainer and
-// uses the context provided by MapContainer correctly
-function MapContent({ 
-  center, 
-  routes = [], 
-  startCoords, 
-  endCoords, 
-  selectedRouteId 
-}: MapProps) {
+// This component renders the internal map contents using the Leaflet context
+const MapContents = ({
+  center,
+  routes = [],
+  startCoords,
+  endCoords,
+  selectedRouteId
+}: MapProps) => {
   return (
     <>
       <TileLayer
@@ -151,10 +160,10 @@ function MapContent({
       )}
     </>
   );
-}
+};
 
 // Main Map component
-const Map = ({ 
+const Map = ({
   center,
   routes = [],
   startCoords,
@@ -163,8 +172,16 @@ const Map = ({
 }: MapProps) => {
   return (
     <div className="map-container h-full">
-      <MapContainer center={center} zoom={12} className="h-full w-full">
-        <MapContent
+      <MapContainer 
+        center={center} 
+        zoom={12} 
+        className="h-full w-full"
+        whenCreated={(map) => {
+          // Optional: You can access the map instance here if needed
+          console.log("Map created:", map);
+        }}
+      >
+        <MapContents
           center={center}
           routes={routes}
           startCoords={startCoords}
