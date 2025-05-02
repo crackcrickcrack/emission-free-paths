@@ -1,7 +1,7 @@
 
 import React from 'react';
 import L from 'leaflet';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet marker icon issue
@@ -26,27 +26,15 @@ interface MapProps {
 }
 
 // Component to update the map view when center changes
+// Correctly using the useMap hook as a proper functional component
 const ChangeMapView = ({ center }: { center: [number, number] }) => {
-  const map = React.useRef<L.Map | null>(null);
+  const map = useMap();
   
   React.useEffect(() => {
-    if (map.current) {
-      map.current.setView(center, map.current.getZoom());
-    }
-  }, [center]);
+    map.setView(center, map.getZoom());
+  }, [center, map]);
   
-  return (
-    <div id="map-view-handler" ref={(el) => {
-      if (el && !map.current) {
-        // Get the map instance from the parent MapContainer
-        const mapContainer = el.closest('.leaflet-container');
-        if (mapContainer) {
-          // @ts-ignore - We know this exists in the Leaflet instance
-          map.current = mapContainer._leaflet_id ? L.map(mapContainer) : null;
-        }
-      }
-    }} style={{ display: 'none' }} />
-  );
+  return null;
 };
 
 // Main Map component
@@ -155,7 +143,9 @@ const Map = ({
         zoom={12} 
         className="h-full w-full"
         whenReady={handleMapReady}
-        ref={mapRef}
+        ref={(mapInstance: L.Map | null) => {
+          mapRef.current = mapInstance;
+        }}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
