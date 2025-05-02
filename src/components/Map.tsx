@@ -38,7 +38,11 @@ const ChangeMapView: React.FC<{ center: [number, number] }> = ({ center }) => {
 
 // Component to handle routes
 const RouteManager: React.FC<{ 
-  routes?: MapProps['routes'], 
+  routes?: Array<{
+    id: string;
+    coordinates: [number, number][];
+    transportMode?: string;
+  }>;
   selectedRouteId?: string 
 }> = ({ routes, selectedRouteId }) => {
   const map = useMap();
@@ -124,7 +128,7 @@ const RouteManager: React.FC<{
   return null;
 };
 
-// Our main Map component - using functional child components correctly
+// Main Map component
 const Map: React.FC<MapProps> = ({
   center,
   routes = [],
@@ -132,13 +136,8 @@ const Map: React.FC<MapProps> = ({
   endCoords,
   selectedRouteId
 }) => {
-  // Make sure we're not rendering anything incorrectly
+  // Log to confirm component renders correctly
   console.log("Map rendering with center:", center);
-
-  // Define a simple function to call when map is ready
-  const handleMapReady = () => {
-    console.log("Map ready");
-  };
 
   return (
     <div className="map-container h-full">
@@ -146,14 +145,14 @@ const Map: React.FC<MapProps> = ({
         center={center} 
         zoom={12} 
         className="h-full w-full"
-        whenCreated={handleMapReady}
+        whenReady={() => console.log("Map ready")}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        {/* Properly encapsulated child components that use React context */}
+        {/* Map context consumers */}
         <ChangeMapView center={center} />
         <RouteManager routes={routes} selectedRouteId={selectedRouteId} />
         
