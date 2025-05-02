@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet marker icon issue
@@ -25,34 +25,22 @@ interface MapProps {
   selectedRouteId?: string;
 }
 
-// Map component that avoids React context issues
-const Map: React.FC<MapProps> = ({
-  center,
-  routes = [],
-  startCoords,
-  endCoords,
-  selectedRouteId
-}) => {
-  const mapRef = useRef<L.Map | null>(null);
+// Component to handle map controller functionality
+const MapController: React.FC<{
+  center: [number, number];
+  routes: MapProps['routes'];
+  selectedRouteId?: string;
+}> = ({ center, routes, selectedRouteId }) => {
+  const map = useMap();
   const routeLayersRef = useRef<L.Polyline[]>([]);
-  
-  // Function to handle map initialization
-  const onMapCreated = (map: L.Map) => {
-    mapRef.current = map;
-  };
   
   // Update map center when center prop changes
   useEffect(() => {
-    if (mapRef.current) {
-      mapRef.current.setView(center, mapRef.current.getZoom());
-    }
-  }, [center]);
+    map.setView(center, map.getZoom());
+  }, [center, map]);
   
   // Handle routes rendering
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    
     // Clean up existing route layers
     routeLayersRef.current.forEach(layer => {
       if (map.hasLayer(layer)) {
@@ -111,17 +99,36 @@ const Map: React.FC<MapProps> = ({
       }
     }
     
-  }, [routes, selectedRouteId]);
+    return () => {
+      // Clean up when component unmounts
+      routeLayersRef.current.forEach(layer => {
+        if (map.hasLayer(layer)) {
+          map.removeLayer(layer);
+        }
+      });
+    };
+  }, [routes, selectedRouteId, map]);
   
+  return null;
+};
+
+// Main Map component
+const Map: React.FC<MapProps> = ({
+  center,
+  routes = [],
+  startCoords,
+  endCoords,
+  selectedRouteId
+}) => {
   return (
     <div className="h-full w-full">
       <MapContainer 
         center={center} 
         zoom={12} 
         style={{ height: '100%', width: '100%' }}
-        ref={onMapCreated}
-        whenCreated={onMapCreated}
       >
+        <MapController center={center} routes={routes} selectedRouteId={selectedRouteId} />
+        
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
