@@ -196,25 +196,36 @@ const defaultCoordinates: Record<string, [number, number]> = {
 export const geocodeLocation = async (location: string): Promise<[number, number]> => {
   try {
     if (!API_KEY) {
+      console.error('API Key is missing');
       throw new Error('OpenRouteService API key is not configured');
     }
 
-    const response = await fetch(
-      `${API_BASE_URL}/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(location)}`
-    );
+    console.log('Geocoding location:', location);
+    const url = `${API_BASE_URL}/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(location)}`;
+    console.log('Geocoding URL:', url);
+
+    const response = await fetch(url);
     
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('Geocoding API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText
+      });
       throw new Error(`Geocoding failed: ${errorText}`);
     }
     
     const data = await response.json();
+    console.log('Geocoding response:', data);
     
     if (!data.features || data.features.length === 0) {
+      console.error('No features found in geocoding response');
       throw new Error(`No results found for location: ${location}`);
     }
     
     const [lng, lat] = data.features[0].geometry.coordinates;
+    console.log('Geocoded coordinates:', [lat, lng]);
     return [lat, lng];
   } catch (error) {
     console.error('Geocoding error:', error);
@@ -230,8 +241,11 @@ export const getRoutes = async (
 ): Promise<any[]> => {
   try {
     if (!API_KEY) {
+      console.error('API Key is missing');
       throw new Error('OpenRouteService API key is not configured');
     }
+
+    console.log('Getting routes:', { startLocation, endLocation, transportMode });
 
     // Geocode both locations
     const [startCoords, endCoords] = await Promise.all([
@@ -239,8 +253,11 @@ export const getRoutes = async (
       geocodeLocation(endLocation)
     ]);
 
+    console.log('Geocoded coordinates:', { startCoords, endCoords });
+
     // Define available transport modes
     const modes = transportMode ? [transportMode] : ['driving', 'cycling', 'walking'];
+    console.log('Transport modes:', modes);
     
     // Get routes for each transport mode
     const routePromises = modes.map(async (mode) => {
@@ -254,6 +271,21 @@ export const getRoutes = async (
         throw new Error(`Unsupported transport mode: ${mode}`);
       }
 
+      console.log(`Getting route for mode: ${mode} with profile: ${profile}`);
+
+      const requestBody = {
+        coordinates: [
+          [startCoords[1], startCoords[0]], // OpenRouteService expects [lng, lat]
+          [endCoords[1], endCoords[0]]
+        ],
+        format: 'geojson',
+        instructions: true,
+        preference: 'fastest',
+        units: 'm'
+      };
+
+      console.log('Route request body:', requestBody);
+
       const response = await fetch(
         `${API_BASE_URL}/directions/${profile}?api_key=${API_KEY}`,
         {
@@ -262,27 +294,26 @@ export const getRoutes = async (
             'Content-Type': 'application/json',
             'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8'
           },
-          body: JSON.stringify({
-            coordinates: [
-              [startCoords[1], startCoords[0]], // OpenRouteService expects [lng, lat]
-              [endCoords[1], endCoords[0]]
-            ],
-            format: 'geojson',
-            instructions: true,
-            preference: 'fastest',
-            units: 'm'
-          })
+          body: JSON.stringify(requestBody)
         }
       );
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('Route API error:', {
+          mode,
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
         throw new Error(`Failed to get route for ${mode}: ${errorText}`);
       }
 
       const data = await response.json();
+      console.log(`Route response for ${mode}:`, data);
       
       if (!data.features || data.features.length === 0) {
+        console.error(`No features found in route response for ${mode}`);
         throw new Error(`No route found for ${mode} between ${startLocation} and ${endLocation}`);
       }
 
@@ -290,6 +321,7 @@ export const getRoutes = async (
       const route = data.features[0];
       
       if (!route.properties || !route.properties.segments || !route.properties.segments[0]) {
+        console.error(`Invalid route data for ${mode}:`, route);
         throw new Error(`Invalid route data for ${mode}`);
       }
 
@@ -298,6 +330,7 @@ export const getRoutes = async (
       const duration = segment.duration / 60; // Convert to minutes
       
       if (!route.geometry || !route.geometry.coordinates) {
+        console.error(`No coordinates found in route for ${mode}`);
         throw new Error(`No coordinates found for ${mode} route`);
       }
 
@@ -313,7 +346,7 @@ export const getRoutes = async (
         duration: (step.duration || 0) / 60 // Convert to minutes
       }));
 
-      return {
+      const routeData = {
         id: `${mode}-${Math.random().toString(36).substring(2, 9)}`,
         transportMode: mode,
         distance,
@@ -327,14 +360,19 @@ export const getRoutes = async (
         steps,
         isEcoFriendly: mode === 'cycling' || mode === 'walking'
       };
+
+      console.log(`Processed route data for ${mode}:`, routeData);
+      return routeData;
     });
 
     const routes = await Promise.all(routePromises);
     
     if (routes.length === 0) {
+      console.error('No routes found between locations');
       throw new Error('No routes found between the specified locations');
     }
 
+    console.log('Final routes:', routes);
     return routes;
   } catch (error) {
     console.error('Error getting routes:', error);
