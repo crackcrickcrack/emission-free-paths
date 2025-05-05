@@ -195,18 +195,23 @@ const defaultCoordinates: Record<string, [number, number]> = {
 // Geocode a location using OpenRouteService Geocoding API
 export const geocodeLocation = async (location: string): Promise<[number, number]> => {
   try {
+    if (!API_KEY) {
+      throw new Error('OpenRouteService API key is not configured');
+    }
+
     const response = await fetch(
       `${API_BASE_URL}/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(location)}`
     );
     
     if (!response.ok) {
-      throw new Error(`Geocoding failed with status: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`Geocoding failed: ${errorText}`);
     }
     
     const data = await response.json();
     
     if (!data.features || data.features.length === 0) {
-      throw new Error('Location not found');
+      throw new Error(`No results found for location: ${location}`);
     }
     
     const [lng, lat] = data.features[0].geometry.coordinates;
@@ -224,6 +229,10 @@ export const getRoutes = async (
   transportMode?: string
 ): Promise<any[]> => {
   try {
+    if (!API_KEY) {
+      throw new Error('OpenRouteService API key is not configured');
+    }
+
     // Geocode both locations
     const [startCoords, endCoords] = await Promise.all([
       geocodeLocation(startLocation),
@@ -231,16 +240,19 @@ export const getRoutes = async (
     ]);
 
     // Define available transport modes
-    const modes = transportMode ? [transportMode] : ['driving', 'transit', 'cycling', 'walking'];
+    const modes = transportMode ? [transportMode] : ['driving', 'cycling', 'walking'];
     
     // Get routes for each transport mode
     const routePromises = modes.map(async (mode) => {
       const profile = {
         driving: 'driving-car',
-        transit: 'driving-car', // OpenRouteService doesn't support transit, using driving as fallback
         cycling: 'cycling-regular',
         walking: 'foot-walking'
       }[mode];
+
+      if (!profile) {
+        throw new Error(`Unsupported transport mode: ${mode}`);
+      }
 
       const response = await fetch(
         `${API_BASE_URL}/directions/${profile}?api_key=${API_KEY}`,
@@ -264,25 +276,41 @@ export const getRoutes = async (
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to get route for ${mode}`);
+        const errorText = await response.text();
+        throw new Error(`Failed to get route for ${mode}: ${errorText}`);
       }
 
       const data = await response.json();
       
+      if (!data.features || data.features.length === 0) {
+        throw new Error(`No route found for ${mode} between ${startLocation} and ${endLocation}`);
+      }
+
       // Extract route information
       const route = data.features[0];
-      const distance = route.properties.segments[0].distance;
-      const duration = route.properties.segments[0].duration / 60; // Convert to minutes
+      
+      if (!route.properties || !route.properties.segments || !route.properties.segments[0]) {
+        throw new Error(`Invalid route data for ${mode}`);
+      }
+
+      const segment = route.properties.segments[0];
+      const distance = segment.distance;
+      const duration = segment.duration / 60; // Convert to minutes
+      
+      if (!route.geometry || !route.geometry.coordinates) {
+        throw new Error(`No coordinates found for ${mode} route`);
+      }
+
       const coordinates = route.geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng]);
       
       // Calculate emissions
       const emissions = calculateEmissions(mode, distance);
       
       // Create route instructions
-      const steps = route.properties.segments[0].steps.map((step: any) => ({
-        instruction: step.instruction,
-        distance: step.distance,
-        duration: step.duration / 60 // Convert to minutes
+      const steps = segment.steps.map((step: any) => ({
+        instruction: step.instruction || "Continue on this path",
+        distance: step.distance || 0,
+        duration: (step.duration || 0) / 60 // Convert to minutes
       }));
 
       return {
@@ -296,11 +324,17 @@ export const getRoutes = async (
         endLocation,
         startCoords,
         endCoords,
-        steps
+        steps,
+        isEcoFriendly: mode === 'cycling' || mode === 'walking'
       };
     });
 
     const routes = await Promise.all(routePromises);
+    
+    if (routes.length === 0) {
+      throw new Error('No routes found between the specified locations');
+    }
+
     return routes;
   } catch (error) {
     console.error('Error getting routes:', error);
