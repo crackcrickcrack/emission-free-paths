@@ -4,21 +4,6 @@
 const API_KEY = import.meta.env.VITE_OPENROUTE_API_KEY;
 const API_BASE_URL = 'https://api.openrouteservice.org/v2';
 
-// Validate API key on service initialization
-if (!API_KEY) {
-  console.error('OpenRouteService API key is missing. Please add VITE_OPENROUTE_API_KEY to your .env file');
-}
-
-// Helper function to validate API key
-const validateApiKey = () => {
-  if (!API_KEY) {
-    throw new Error('OpenRouteService API key is not configured. Please add VITE_OPENROUTE_API_KEY to your .env file');
-  }
-  if (API_KEY.length < 10) {
-    throw new Error('Invalid OpenRouteService API key format');
-  }
-};
-
 // Helper function to generate random coordinates around a center point
 const generateRandomCoordinates = (
   center: [number, number], 
@@ -210,20 +195,29 @@ const defaultCoordinates: Record<string, [number, number]> = {
 // Geocode a location using OpenRouteService Geocoding API
 export const geocodeLocation = async (location: string): Promise<[number, number]> => {
   try {
-    if (!API_KEY) {
-      throw new Error('Please add your OpenRouteService API key to the .env file');
-    }
+    validateApiKey();
 
-    const response = await fetch(
-      `${API_BASE_URL}/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(location)}`
-    );
+    console.log('Geocoding location:', location);
+    const url = `${API_BASE_URL}/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(location)}`;
+    console.log('Geocoding URL:', url);
+
+    const response = await fetch(url);
     
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('Geocoding API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText
+      });
+      
       if (response.status === 401) {
-        throw new Error('Invalid API key. Please check your OpenRouteService API key');
+        throw new Error('Invalid API key. Please check your OpenRouteService API key configuration.');
+      } else if (response.status === 429) {
+        throw new Error('API rate limit exceeded. Please try again later.');
+      } else {
+        throw new Error(`Geocoding failed: ${errorText}`);
       }
-      throw new Error(`Geocoding failed: ${errorText}`);
     }
     
     const data = await response.json();
@@ -247,9 +241,9 @@ export const getRoutes = async (
   transportMode?: string
 ): Promise<any[]> => {
   try {
-    if (!API_KEY) {
-      throw new Error('Please add your OpenRouteService API key to the .env file');
-    }
+    validateApiKey();
+
+    console.log('Getting routes:', { startLocation, endLocation, transportMode });
 
     // Geocode both locations
     const [startCoords, endCoords] = await Promise.all([
@@ -295,10 +289,20 @@ export const getRoutes = async (
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('Route API error:', {
+          mode,
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+
         if (response.status === 401) {
-          throw new Error('Invalid API key. Please check your OpenRouteService API key');
+          throw new Error('Invalid API key. Please check your OpenRouteService API key configuration.');
+        } else if (response.status === 429) {
+          throw new Error('API rate limit exceeded. Please try again later.');
+        } else {
+          throw new Error(`Failed to get route for ${mode}: ${errorText}`);
         }
-        throw new Error(`Failed to get route for ${mode}: ${errorText}`);
       }
 
       const data = await response.json();
