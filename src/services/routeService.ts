@@ -19,6 +19,31 @@ const validateApiKey = () => {
   }
 };
 
+// Helper function to handle API errors
+const handleApiError = async (response: Response, context: string) => {
+  const errorText = await response.text();
+  console.error(`${context} API error:`, {
+    status: response.status,
+    statusText: response.statusText,
+    error: errorText
+  });
+
+  switch (response.status) {
+    case 401:
+      throw new Error('Invalid API key. Please check your OpenRouteService API key configuration.');
+    case 429:
+      throw new Error('API rate limit exceeded. Please try again later.');
+    case 400:
+      throw new Error(`Invalid request: ${errorText}`);
+    case 404:
+      throw new Error(`Route not found: ${errorText}`);
+    case 500:
+      throw new Error('OpenRouteService API is currently unavailable. Please try again later.');
+    default:
+      throw new Error(`${context} failed: ${errorText}`);
+  }
+};
+
 // Helper function to generate random coordinates around a center point
 const generateRandomCoordinates = (
   center: [number, number], 
@@ -216,23 +241,18 @@ export const geocodeLocation = async (location: string): Promise<[number, number
     const url = `${API_BASE_URL}/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(location)}`;
     console.log('Geocoding URL:', url);
 
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8'
+      }
+    }).catch(error => {
+      console.error('Network error during geocoding:', error);
+      throw new Error('Network error: Unable to connect to OpenRouteService API');
+    });
     
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Geocoding API error:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorText
-      });
-      
-      if (response.status === 401) {
-        throw new Error('Invalid API key. Please check your OpenRouteService API key configuration.');
-      } else if (response.status === 429) {
-        throw new Error('API rate limit exceeded. Please try again later.');
-      } else {
-        throw new Error(`Geocoding failed: ${errorText}`);
-      }
+      await handleApiError(response, 'Geocoding');
     }
     
     const data = await response.json();
@@ -315,24 +335,13 @@ export const getRoutes = async (
           },
           body: JSON.stringify(requestBody)
         }
-      );
+      ).catch(error => {
+        console.error('Network error during route calculation:', error);
+        throw new Error('Network error: Unable to connect to OpenRouteService API');
+      });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Route API error:', {
-          mode,
-          status: response.status,
-          statusText: response.statusText,
-          error: errorText
-        });
-
-        if (response.status === 401) {
-          throw new Error('Invalid API key. Please check your OpenRouteService API key configuration.');
-        } else if (response.status === 429) {
-          throw new Error('API rate limit exceeded. Please try again later.');
-        } else {
-          throw new Error(`Failed to get route for ${mode}: ${errorText}`);
-        }
+        await handleApiError(response, `Route calculation for ${mode}`);
       }
 
       const data = await response.json();
