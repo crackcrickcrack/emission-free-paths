@@ -4,6 +4,21 @@
 const API_KEY = import.meta.env.VITE_OPENROUTE_API_KEY;
 const API_BASE_URL = 'https://api.openrouteservice.org/v2';
 
+// Validate API key on service initialization
+if (!API_KEY) {
+  console.error('OpenRouteService API key is missing. Please add VITE_OPENROUTE_API_KEY to your .env file');
+}
+
+// Helper function to validate API key
+const validateApiKey = () => {
+  if (!API_KEY) {
+    throw new Error('OpenRouteService API key is not configured. Please add VITE_OPENROUTE_API_KEY to your .env file');
+  }
+  if (API_KEY.length < 10) {
+    throw new Error('Invalid OpenRouteService API key format');
+  }
+};
+
 // Helper function to generate random coordinates around a center point
 const generateRandomCoordinates = (
   center: [number, number], 
@@ -221,16 +236,22 @@ export const geocodeLocation = async (location: string): Promise<[number, number
     }
     
     const data = await response.json();
+    console.log('Geocoding response:', data);
     
     if (!data.features || data.features.length === 0) {
+      console.error('No features found in geocoding response');
       throw new Error(`No results found for location: ${location}`);
     }
     
     const [lng, lat] = data.features[0].geometry.coordinates;
+    console.log('Geocoded coordinates:', [lat, lng]);
     return [lat, lng];
   } catch (error) {
     console.error('Geocoding error:', error);
-    throw error;
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Failed to geocode location');
   }
 };
 
@@ -251,8 +272,11 @@ export const getRoutes = async (
       geocodeLocation(endLocation)
     ]);
 
+    console.log('Geocoded coordinates:', { startCoords, endCoords });
+
     // Define available transport modes
     const modes = transportMode ? [transportMode] : ['driving', 'cycling', 'walking'];
+    console.log('Transport modes:', modes);
     
     // Get routes for each transport mode
     const routePromises = modes.map(async (mode) => {
@@ -266,6 +290,21 @@ export const getRoutes = async (
         throw new Error(`Unsupported transport mode: ${mode}`);
       }
 
+      console.log(`Getting route for mode: ${mode} with profile: ${profile}`);
+
+      const requestBody = {
+        coordinates: [
+          [startCoords[1], startCoords[0]], // OpenRouteService expects [lng, lat]
+          [endCoords[1], endCoords[0]]
+        ],
+        format: 'geojson',
+        instructions: true,
+        preference: 'fastest',
+        units: 'm'
+      };
+
+      console.log('Route request body:', requestBody);
+
       const response = await fetch(
         `${API_BASE_URL}/directions/${profile}?api_key=${API_KEY}`,
         {
@@ -274,16 +313,7 @@ export const getRoutes = async (
             'Content-Type': 'application/json',
             'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8'
           },
-          body: JSON.stringify({
-            coordinates: [
-              [startCoords[1], startCoords[0]], // OpenRouteService expects [lng, lat]
-              [endCoords[1], endCoords[0]]
-            ],
-            format: 'geojson',
-            instructions: true,
-            preference: 'fastest',
-            units: 'm'
-          })
+          body: JSON.stringify(requestBody)
         }
       );
 
@@ -306,8 +336,10 @@ export const getRoutes = async (
       }
 
       const data = await response.json();
+      console.log(`Route response for ${mode}:`, data);
       
       if (!data.features || data.features.length === 0) {
+        console.error(`No features found in route response for ${mode}`);
         throw new Error(`No route found for ${mode} between ${startLocation} and ${endLocation}`);
       }
 
@@ -315,6 +347,7 @@ export const getRoutes = async (
       const route = data.features[0];
       
       if (!route.properties || !route.properties.segments || !route.properties.segments[0]) {
+        console.error(`Invalid route data for ${mode}:`, route);
         throw new Error(`Invalid route data for ${mode}`);
       }
 
@@ -323,6 +356,7 @@ export const getRoutes = async (
       const duration = segment.duration / 60; // Convert to minutes
       
       if (!route.geometry || !route.geometry.coordinates) {
+        console.error(`No coordinates found in route for ${mode}`);
         throw new Error(`No coordinates found for ${mode} route`);
       }
 
@@ -338,7 +372,7 @@ export const getRoutes = async (
         duration: (step.duration || 0) / 60 // Convert to minutes
       }));
 
-      return {
+      const routeData = {
         id: `${mode}-${Math.random().toString(36).substring(2, 9)}`,
         transportMode: mode,
         distance,
@@ -352,18 +386,26 @@ export const getRoutes = async (
         steps,
         isEcoFriendly: mode === 'cycling' || mode === 'walking'
       };
+
+      console.log(`Processed route data for ${mode}:`, routeData);
+      return routeData;
     });
 
     const routes = await Promise.all(routePromises);
     
     if (routes.length === 0) {
+      console.error('No routes found between locations');
       throw new Error('No routes found between the specified locations');
     }
 
+    console.log('Final routes:', routes);
     return routes;
   } catch (error) {
     console.error('Error getting routes:', error);
-    throw error;
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Failed to calculate routes');
   }
 };
 
