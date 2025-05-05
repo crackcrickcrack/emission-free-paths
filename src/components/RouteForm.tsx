@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import TransportModeSelector from './TransportModeSelector';
+import LocationAutocomplete from './LocationAutocomplete';
 
 interface RouteFormProps {
   onSearch: (start: string, destination: string, mode: string) => void;
@@ -28,29 +27,21 @@ const RouteForm: React.FC<RouteFormProps> = ({ onSearch, isLoading }) => {
       <CardContent className="pt-4">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex flex-col md:flex-row md:items-center gap-4">
-            <div className="relative flex-grow">
-              <Input
-                className="pl-10"
-                placeholder="Starting point"
+            <div className="flex-grow">
+              <LocationAutocomplete
                 value={startLocation}
-                onChange={(e) => setStartLocation(e.target.value)}
-                required
+                onChange={setStartLocation}
+                placeholder="Starting point"
+                color="green"
               />
-              <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                <div className="w-2 h-2 rounded-full bg-green-500 ring-2 ring-green-300"></div>
-              </div>
             </div>
-            <div className="relative flex-grow">
-              <Input
-                className="pl-10"
-                placeholder="Destination"
+            <div className="flex-grow">
+              <LocationAutocomplete
                 value={destination}
-                onChange={(e) => setDestination(e.target.value)}
-                required
+                onChange={setDestination}
+                placeholder="Destination"
+                color="red"
               />
-              <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                <div className="w-2 h-2 rounded-full bg-red-500 ring-2 ring-red-300"></div>
-              </div>
             </div>
             <Button 
               type="submit" 
