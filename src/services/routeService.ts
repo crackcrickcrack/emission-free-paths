@@ -192,51 +192,32 @@ const defaultCoordinates: Record<string, [number, number]> = {
   end: [53.4808, -2.2426]    // Manchester
 };
 
-// Geocode a location using OpenRouteService Geocoding API or fallback to mock data
+// Geocode a location using OpenRouteService Geocoding API
 export const geocodeLocation = async (location: string): Promise<[number, number]> => {
   try {
-    // Check mock data first (case insensitive)
-    const locationLower = location.toLowerCase();
-    if (mockGeocodeData[locationLower]) {
-      console.log(`Using mock geocode data for ${location}`);
-      return mockGeocodeData[locationLower];
-    }
-    
-    // Try the API
-    console.log(`Geocoding location: ${location} with API key: ${API_KEY.substring(0, 5)}...`);
     const response = await fetch(
       `${API_BASE_URL}/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(location)}`
     );
     
     if (!response.ok) {
-      console.error(`Geocoding API error: ${response.status} ${response.statusText}`);
       throw new Error(`Geocoding failed with status: ${response.status}`);
     }
     
     const data = await response.json();
-    console.log('Geocoding API response:', data);
     
     if (!data.features || data.features.length === 0) {
-      console.error('Location not found in API response');
       throw new Error('Location not found');
     }
     
     const [lng, lat] = data.features[0].geometry.coordinates;
-    console.log(`Geocoded coordinates: [${lat}, ${lng}]`);
     return [lat, lng];
   } catch (error) {
     console.error('Geocoding error:', error);
-    
-    // Generate fallback coordinates with some randomness
-    const randomLat = defaultCoordinates.start[0] + (Math.random() - 0.5) * 10;
-    const randomLng = defaultCoordinates.start[1] + (Math.random() - 0.5) * 10;
-    console.log(`Using fallback coordinates for ${location}: [${randomLat}, ${randomLng}]`);
-    
-    return [randomLat, randomLng];
+    throw error;
   }
 };
 
-// Get routes between two points with fallback to mock data
+// Get routes between two points using OpenRouteService
 export const getRoutes = async (
   startLocation: string,
   endLocation: string,
@@ -244,7 +225,6 @@ export const getRoutes = async (
 ): Promise<any[]> => {
   try {
     // Geocode both locations
-    console.log(`Getting routes from ${startLocation} to ${endLocation}, mode: ${transportMode || 'all'}`);
     const [startCoords, endCoords] = await Promise.all([
       geocodeLocation(startLocation),
       geocodeLocation(endLocation)
@@ -253,153 +233,78 @@ export const getRoutes = async (
     // Define available transport modes
     const modes = transportMode ? [transportMode] : ['driving', 'transit', 'cycling', 'walking'];
     
-    let routes: any[] = [];
-    
-    try {
-      console.log('Attempting to get routes from API...');
-      console.log(`API Key being used: ${API_KEY.substring(0, 5)}...`);
-      
-      // Try to get routes from the API
-      const routePromises = modes.map(async (mode) => {
-        try {
-          const profile = {
-            driving: 'driving-car',
-            transit: 'driving-car', // OpenRouteService doesn't support transit, using driving as fallback
-            cycling: 'cycling-regular',
-            walking: 'foot-walking'
-          }[mode];
+    // Get routes for each transport mode
+    const routePromises = modes.map(async (mode) => {
+      const profile = {
+        driving: 'driving-car',
+        transit: 'driving-car', // OpenRouteService doesn't support transit, using driving as fallback
+        cycling: 'cycling-regular',
+        walking: 'foot-walking'
+      }[mode];
 
-          console.log(`Fetching route for mode: ${mode} using profile: ${profile}`);
-          
-          const body = JSON.stringify({
+      const response = await fetch(
+        `${API_BASE_URL}/directions/${profile}?api_key=${API_KEY}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8'
+          },
+          body: JSON.stringify({
             coordinates: [
               [startCoords[1], startCoords[0]], // OpenRouteService expects [lng, lat]
               [endCoords[1], endCoords[0]]
             ],
-            format: 'geojson'
-          });
-          
-          console.log(`Request body: ${body}`);
-          
-          const response = await fetch(
-            `${API_BASE_URL}/directions/${profile}?api_key=${API_KEY}`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8'
-              },
-              body
-            }
-          );
-
-          if (!response.ok) {
-            console.error(`API error for ${mode}: ${response.status} ${response.statusText}`);
-            const errorText = await response.text();
-            console.error(`Error response: ${errorText}`);
-            throw new Error(`Failed to get route for ${mode} with status: ${response.status}`);
-          }
-
-          const data = await response.json();
-          console.log(`Got API response for ${mode}:`, data);
-          
-          // Make sure the data structure exists before accessing properties
-          if (!data.features || !data.features[0] || !data.features[0].properties || 
-              !data.features[0].properties.segments || !data.features[0].properties.segments[0] ||
-              !data.features[0].geometry || !data.features[0].geometry.coordinates) {
-            console.error(`Invalid response structure for ${mode}`);
-            throw new Error(`Invalid response data for ${mode}`);
-          }
-          
-          // Extract route information
-          const route = data.features[0];
-          const distance = route.properties.segments[0].distance;
-          const duration = route.properties.segments[0].duration / 60; // Convert to minutes
-          
-          console.log(`API route for ${mode}: distance=${distance}m, duration=${duration}min`);
-          
-          // Convert coordinates from [lng, lat] to [lat, lng] for Leaflet
-          const coordinates = route.geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng]);
-          console.log(`Route has ${coordinates.length} coordinate points`);
-          
-          // Calculate emissions
-          const emissions = calculateEmissions(mode, distance);
-          
-          // Process steps if they exist
-          let steps = [];
-          if (route.properties.segments[0].steps) {
-            steps = route.properties.segments[0].steps.map((step: any) => ({
-              instruction: step.instruction || "Continue on this path",
-              distance: step.distance || 0,
-              duration: (step.duration || 0) / 60 // Convert to minutes
-            }));
-          } else {
-            // Create mock steps if none exist in the response
-            steps = createRouteInstructions(mode, coordinates.length);
-          }
-          
-          return {
-            id: `${mode}-${Math.random().toString(36).substring(2, 9)}`,
-            transportMode: mode,
-            distance,
-            duration,
-            emissions,
-            coordinates,
-            startLocation,
-            endLocation,
-            startCoords,
-            endCoords,
-            steps,
-            isEcoFriendly: mode === 'cycling' || mode === 'walking'
-          };
-        } catch (error) {
-          console.error(`Error fetching ${mode} route:`, error);
-          // If individual mode fails, return null to be filtered out later
-          return null;
+            format: 'geojson',
+            instructions: true,
+            preference: 'fastest',
+            units: 'm'
+          })
         }
-      });
+      );
 
-      // Wait for all promises to resolve
-      const apiResults = await Promise.all(routePromises);
-      // Filter out null results from failed API calls
-      routes = apiResults.filter(route => route !== null);
-      console.log(`Got ${routes.length} valid routes from API`);
-    } catch (error) {
-      console.error('Error getting API routes:', error);
-      // Will continue to fallback below
-    }
-    
-    // If no routes from API, use mock data
-    if (routes.length === 0) {
-      console.log('No API routes available, using mock routes as fallback');
-      routes = modes.map(mode => createRoute(
-        startCoords,
-        endCoords,
+      if (!response.ok) {
+        throw new Error(`Failed to get route for ${mode}`);
+      }
+
+      const data = await response.json();
+      
+      // Extract route information
+      const route = data.features[0];
+      const distance = route.properties.segments[0].distance;
+      const duration = route.properties.segments[0].duration / 60; // Convert to minutes
+      const coordinates = route.geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng]);
+      
+      // Calculate emissions
+      const emissions = calculateEmissions(mode, distance);
+      
+      // Create route instructions
+      const steps = route.properties.segments[0].steps.map((step: any) => ({
+        instruction: step.instruction,
+        distance: step.distance,
+        duration: step.duration / 60 // Convert to minutes
+      }));
+
+      return {
+        id: `${mode}-${Math.random().toString(36).substring(2, 9)}`,
+        transportMode: mode,
+        distance,
+        duration,
+        emissions,
+        coordinates,
         startLocation,
         endLocation,
-        mode
-      ));
-      console.log(`Created ${routes.length} mock routes as fallback`);
-    }
+        startCoords,
+        endCoords,
+        steps
+      };
+    });
 
+    const routes = await Promise.all(routePromises);
     return routes;
   } catch (error) {
     console.error('Error getting routes:', error);
-    
-    // Use fallback mock data for both locations
-    const startCoords = await geocodeLocation(startLocation);
-    const endCoords = await geocodeLocation(endLocation);
-    
-    const modes = transportMode ? [transportMode] : ['driving', 'transit', 'cycling', 'walking'];
-    const mockRoutes = modes.map(mode => createRoute(
-      startCoords,
-      endCoords,
-      startLocation,
-      endLocation,
-      mode
-    ));
-    console.log(`Created ${mockRoutes.length} mock routes after error`);
-    return mockRoutes;
+    throw error;
   }
 };
 
