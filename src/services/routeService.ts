@@ -283,14 +283,36 @@ export const getRoutes = async (
 
           const data = await response.json();
           
+          // Make sure the data structure exists before accessing properties
+          if (!data.features || !data.features[0] || !data.features[0].properties || 
+              !data.features[0].properties.segments || !data.features[0].properties.segments[0] ||
+              !data.features[0].geometry || !data.features[0].geometry.coordinates) {
+            throw new Error(`Invalid response data for ${mode}`);
+          }
+          
           // Extract route information
           const route = data.features[0];
           const distance = route.properties.segments[0].distance;
           const duration = route.properties.segments[0].duration / 60; // Convert to minutes
+          
+          // Convert coordinates from [lng, lat] to [lat, lng] for Leaflet
           const coordinates = route.geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng]);
           
           // Calculate emissions
           const emissions = calculateEmissions(mode, distance);
+          
+          // Process steps if they exist
+          let steps = [];
+          if (route.properties.segments[0].steps) {
+            steps = route.properties.segments[0].steps.map((step: any) => ({
+              instruction: step.instruction || "Continue on this path",
+              distance: step.distance || 0,
+              duration: (step.duration || 0) / 60 // Convert to minutes
+            }));
+          } else {
+            // Create mock steps if none exist in the response
+            steps = createRouteInstructions(mode, coordinates.length);
+          }
           
           return {
             id: `${mode}-${Math.random().toString(36).substring(2, 9)}`,
@@ -303,11 +325,8 @@ export const getRoutes = async (
             endLocation,
             startCoords,
             endCoords,
-            steps: route.properties.segments[0].steps.map((step: any) => ({
-              instruction: step.instruction,
-              distance: step.distance,
-              duration: step.duration / 60 // Convert to minutes
-            }))
+            steps,
+            isEcoFriendly: mode === 'cycling' || mode === 'walking'
           };
         } catch (error) {
           console.error(`Error fetching ${mode} route:`, error);

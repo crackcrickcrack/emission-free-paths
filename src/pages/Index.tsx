@@ -17,13 +17,31 @@ const Index = () => {
   const [center, setCenter] = useState<[number, number]>([51.505, -0.09]);
   const [startCoords, setStartCoords] = useState<[number, number] | undefined>(undefined);
   const [endCoords, setEndCoords] = useState<[number, number] | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
 
   const selectedRoute = routes.find(route => route.id === selectedRouteId);
 
+  // Validate coordinates are proper [lat, lng] format
+  const isValidCoord = (coord: any): coord is [number, number] => {
+    return Array.isArray(coord) && 
+           coord.length === 2 && 
+           !isNaN(coord[0]) && 
+           !isNaN(coord[1]);
+  };
+
   const handleSearch = async (start: string, destination: string, mode: string) => {
     setIsLoading(true);
+    setError(null);
+    
     try {
+      console.log(`Searching for routes from ${start} to ${destination} via ${mode}`);
       const routeData = await getRoutes(start, destination, mode);
+      
+      if (!routeData || routeData.length === 0) {
+        throw new Error('No routes found');
+      }
+      
+      console.log('Routes retrieved:', routeData.length);
       setRoutes(routeData);
       
       // Select the first route by default
@@ -33,15 +51,23 @@ const Index = () => {
         // Set map center
         if (routeData[0].coordinates && routeData[0].coordinates.length > 0) {
           const midPoint = Math.floor(routeData[0].coordinates.length / 2);
-          setCenter(routeData[0].coordinates[midPoint]);
+          const centerCoord = routeData[0].coordinates[midPoint];
+          
+          if (isValidCoord(centerCoord)) {
+            setCenter(centerCoord);
+            console.log('Set map center to:', centerCoord);
+          }
         }
         
         // Set start and end coordinates
-        if (routeData[0].startCoords) {
+        if (isValidCoord(routeData[0].startCoords)) {
           setStartCoords(routeData[0].startCoords);
+          console.log('Set start coords to:', routeData[0].startCoords);
         }
-        if (routeData[0].endCoords) {
+        
+        if (isValidCoord(routeData[0].endCoords)) {
           setEndCoords(routeData[0].endCoords);
+          console.log('Set end coords to:', routeData[0].endCoords);
         }
         
         toast.success('Routes calculated successfully', {
@@ -50,11 +76,27 @@ const Index = () => {
       }
     } catch (error) {
       console.error('Error calculating routes:', error);
+      setError(error instanceof Error ? error.message : 'Unknown error');
+      
       toast.error('Error calculating routes', {
         description: 'Please try again or check your input.'
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Select a different route
+  const handleRouteSelect = (routeId: string) => {
+    setSelectedRouteId(routeId);
+    const route = routes.find(r => r.id === routeId);
+    
+    if (route && route.coordinates && route.coordinates.length > 0) {
+      // Update map center to middle of the selected route
+      const midPoint = Math.floor(route.coordinates.length / 2);
+      if (isValidCoord(route.coordinates[midPoint])) {
+        setCenter(route.coordinates[midPoint]);
+      }
     }
   };
 
@@ -88,6 +130,12 @@ const Index = () => {
                   selectedRouteId={selectedRouteId}
                 />
               </div>
+              
+              {error && (
+                <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md text-red-600 dark:text-red-300 text-sm">
+                  {error}
+                </div>
+              )}
             </div>
             
             <div className="space-y-4">
@@ -99,7 +147,7 @@ const Index = () => {
                         key={route.id}
                         route={route}
                         isSelected={route.id === selectedRouteId}
-                        onClick={() => setSelectedRouteId(route.id)}
+                        onClick={() => handleRouteSelect(route.id)}
                       />
                     ))}
                   </div>

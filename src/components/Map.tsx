@@ -29,10 +29,10 @@ interface MapProps {
 
 // Component to handle map routes
 function MapRoutes({ 
-  routes, 
+  routes = [], 
   selectedRouteId 
 }: { 
-  routes: MapProps['routes'],
+  routes?: MapProps['routes'],
   selectedRouteId?: string 
 }) {
   const map = useMap();
@@ -62,7 +62,20 @@ function MapRoutes({
       const isSelected = route.id === selectedRouteId;
       
       if (route.coordinates && route.coordinates.length > 0) {
-        const polyline = L.polyline(route.coordinates, {
+        // Ensure coordinates are valid
+        const validCoordinates = route.coordinates.filter(coord => 
+          Array.isArray(coord) && 
+          coord.length === 2 && 
+          !isNaN(coord[0]) && 
+          !isNaN(coord[1])
+        );
+        
+        if (validCoordinates.length < 2) {
+          console.warn('Not enough valid coordinates for route:', route.id);
+          return;
+        }
+        
+        const polyline = L.polyline(validCoordinates, {
           color: isSelected ? '#15803d' : '#4ade80',
           weight: isSelected ? 5 : 3,
           opacity: isSelected ? 1 : 0.7,
@@ -93,15 +106,19 @@ function MapRoutes({
         routesRef.current.push(polyline);
         
         // Collect coordinates for bounds calculation
-        allCoordinates.push(...route.coordinates);
+        allCoordinates.push(...validCoordinates);
       }
     });
     
     // Fit bounds if we have coordinates
     if (allCoordinates.length > 0) {
-      const bounds = L.latLngBounds(allCoordinates);
-      if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [50, 50] });
+      try {
+        const bounds = L.latLngBounds(allCoordinates);
+        if (bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [50, 50] });
+        }
+      } catch (error) {
+        console.error('Error setting map bounds:', error);
       }
     }
     
@@ -122,13 +139,15 @@ function MapMarkers({
 }) {
   return (
     <>
-      {startCoords && (
+      {startCoords && Array.isArray(startCoords) && startCoords.length === 2 && 
+       !isNaN(startCoords[0]) && !isNaN(startCoords[1]) && (
         <Marker position={startCoords}>
           <Popup>Starting Point</Popup>
         </Marker>
       )}
       
-      {endCoords && (
+      {endCoords && Array.isArray(endCoords) && endCoords.length === 2 &&
+       !isNaN(endCoords[0]) && !isNaN(endCoords[1]) && (
         <Marker position={endCoords}>
           <Popup>Destination</Popup>
         </Marker>
@@ -142,7 +161,10 @@ function MapController({ center }: { center: [number, number] }) {
   const map = useMap();
   
   useEffect(() => {
-    map.setView(center, map.getZoom());
+    if (center && Array.isArray(center) && center.length === 2 && 
+        !isNaN(center[0]) && !isNaN(center[1])) {
+      map.setView(center, map.getZoom());
+    }
   }, [center, map]);
   
   return null;
@@ -203,6 +225,11 @@ const Map: React.FC<MapProps> = ({
         style={{ height: '100%', width: '100%' }}
         whenReady={() => setMapReady(true)}
       >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        
         {mapReady && (
           <>
             <MapController center={center} />
@@ -210,11 +237,6 @@ const Map: React.FC<MapProps> = ({
             <MapMarkers startCoords={startCoords} endCoords={endCoords} />
           </>
         )}
-        
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
       </MapContainer>
     </div>
   );
