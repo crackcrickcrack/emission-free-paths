@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -7,6 +6,7 @@ import Map from '@/components/Map';
 import RouteCard from '@/components/RouteCard';
 import EmissionsChart from '@/components/EmissionsChart';
 import RouteDetails from '@/components/RouteDetails';
+import ErrorDisplay from '@/components/ErrorDisplay';
 import { getRoutes } from '@/services/routeService';
 import { toast } from '@/components/ui/sonner';
 
@@ -18,6 +18,7 @@ const Index = () => {
   const [startCoords, setStartCoords] = useState<[number, number] | undefined>(undefined);
   const [endCoords, setEndCoords] = useState<[number, number] | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   const selectedRoute = routes.find(route => route.id === selectedRouteId);
 
@@ -32,6 +33,7 @@ const Index = () => {
   const handleSearch = async (start: string, destination: string, mode: string) => {
     setIsLoading(true);
     setError(null);
+    setErrorDetails(null);
     
     try {
       console.log(`Searching for routes from ${start} to ${destination} via ${mode}`);
@@ -76,10 +78,12 @@ const Index = () => {
       }
     } catch (error) {
       console.error('Error calculating routes:', error);
-      setError(error instanceof Error ? error.message : 'Unknown error');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setError('Failed to calculate routes');
+      setErrorDetails(errorMessage);
       
       toast.error('Error calculating routes', {
-        description: 'Please try again or check your input.'
+        description: errorMessage
       });
     } finally {
       setIsLoading(false);
@@ -119,6 +123,15 @@ const Index = () => {
             <RouteForm onSearch={handleSearch} isLoading={isLoading} />
           </div>
           
+          {error && (
+            <div className="mb-6">
+              <ErrorDisplay 
+                error={errorDetails || error} 
+                title={error}
+              />
+            </div>
+          )}
+          
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden h-[400px] md:h-[500px]">
@@ -130,12 +143,6 @@ const Index = () => {
                   selectedRouteId={selectedRouteId}
                 />
               </div>
-              
-              {error && (
-                <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md text-red-600 dark:text-red-300 text-sm">
-                  {error}
-                </div>
-              )}
             </div>
             
             <div className="space-y-4">
