@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState, Component, ReactNode } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -26,114 +27,72 @@ interface MapProps {
   selectedRouteId?: string;
 }
 
-interface MapControllerProps {
-  center: [number, number];
-  routes: MapProps['routes'];
-  selectedRouteId?: string;
-}
-
-// Error boundary component
-interface ErrorBoundaryProps {
-  children: ReactNode;
-}
-
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error: Error | null;
-}
-
-class MapErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="h-full w-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
-          <Alert variant="destructive" className="max-w-md">
-            <AlertDescription>
-              Failed to load map: {this.state.error?.message}
-            </AlertDescription>
-          </Alert>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
-// Loading component
-const MapLoading = () => (
-  <div className="h-full w-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
-    <Loader2 className="h-8 w-8 animate-spin text-green-600" />
-  </div>
-);
-
-// Component to handle map controller functionality
-const MapController: React.FC<MapControllerProps> = ({ center, routes, selectedRouteId }) => {
+// Component to handle map routes
+function MapRoutes({ 
+  routes, 
+  selectedRouteId 
+}: { 
+  routes: MapProps['routes'],
+  selectedRouteId?: string 
+}) {
   const map = useMap();
-  const routeLayersRef = useRef<L.Polyline[]>([]);
-  
-  // Update map center when center prop changes
-  useEffect(() => {
-    map.setView(center, map.getZoom());
-  }, [center, map]);
-  
-  // Handle routes rendering
-  useEffect(() => {
-    // Clean up existing route layers
-    routeLayersRef.current.forEach(layer => {
-      if (map.hasLayer(layer)) {
-        map.removeLayer(layer);
+  const routesRef = React.useRef<L.Polyline[]>([]);
+
+  // Cleanup function to remove routes when component unmounts or routes change
+  const clearRoutes = () => {
+    routesRef.current.forEach(route => {
+      if (map && route) {
+        map.removeLayer(route);
       }
     });
-    
-    routeLayersRef.current = [];
-    
+    routesRef.current = [];
+  };
+
+  useEffect(() => {
+    // Clear existing routes
+    clearRoutes();
+
+    // Skip if no routes
     if (!routes || routes.length === 0) return;
-    
-    // Add new route lines
+
+    // Add new routes
     const allCoordinates: [number, number][] = [];
-    
+
     routes.forEach(route => {
       const isSelected = route.id === selectedRouteId;
       
-      const polyline = L.polyline(route.coordinates, {
-        color: isSelected ? '#15803d' : '#4ade80',
-        weight: isSelected ? 5 : 3,
-        opacity: isSelected ? 1 : 0.7,
-        dashArray: route.transportMode === 'transit' ? '5, 5' : ''
-      });
-      
-      polyline.on('mouseover', () => {
-        if (!isSelected) {
-          polyline.setStyle({
-            weight: 4,
-            opacity: 0.9
-          });
-        }
-      });
-      
-      polyline.on('mouseout', () => {
-        if (!isSelected) {
-          polyline.setStyle({
-            weight: 3,
-            opacity: 0.7
-          });
-        }
-      });
-      
-      polyline.addTo(map);
-      routeLayersRef.current.push(polyline);
-      
       if (route.coordinates && route.coordinates.length > 0) {
+        const polyline = L.polyline(route.coordinates, {
+          color: isSelected ? '#15803d' : '#4ade80',
+          weight: isSelected ? 5 : 3,
+          opacity: isSelected ? 1 : 0.7,
+          dashArray: route.transportMode === 'transit' ? '5, 5' : ''
+        });
+        
+        // Add hover effects
+        polyline.on('mouseover', () => {
+          if (!isSelected) {
+            polyline.setStyle({
+              weight: 4,
+              opacity: 0.9
+            });
+          }
+        });
+        
+        polyline.on('mouseout', () => {
+          if (!isSelected) {
+            polyline.setStyle({
+              weight: 3,
+              opacity: 0.7
+            });
+          }
+        });
+        
+        // Add to map and store reference
+        polyline.addTo(map);
+        routesRef.current.push(polyline);
+        
+        // Collect coordinates for bounds calculation
         allCoordinates.push(...route.coordinates);
       }
     });
@@ -146,18 +105,66 @@ const MapController: React.FC<MapControllerProps> = ({ center, routes, selectedR
       }
     }
     
-    return () => {
-      // Clean up when component unmounts
-      routeLayersRef.current.forEach(layer => {
-        if (map.hasLayer(layer)) {
-          map.removeLayer(layer);
-        }
-      });
-    };
-  }, [routes, selectedRouteId, map]);
+    // Cleanup on unmount or when routes change
+    return clearRoutes;
+  }, [map, routes, selectedRouteId]);
+
+  return null;
+}
+
+// Component to handle map markers
+function MapMarkers({ 
+  startCoords, 
+  endCoords 
+}: { 
+  startCoords?: [number, number],
+  endCoords?: [number, number]
+}) {
+  return (
+    <>
+      {startCoords && (
+        <Marker position={startCoords}>
+          <Popup>Starting Point</Popup>
+        </Marker>
+      )}
+      
+      {endCoords && (
+        <Marker position={endCoords}>
+          <Popup>Destination</Popup>
+        </Marker>
+      )}
+    </>
+  );
+}
+
+// Component to handle map center updates
+function MapController({ center }: { center: [number, number] }) {
+  const map = useMap();
+  
+  useEffect(() => {
+    map.setView(center, map.getZoom());
+  }, [center, map]);
   
   return null;
-};
+}
+
+// Error display component
+const MapError = ({ error }: { error: Error }) => (
+  <div className="h-full w-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+    <Alert variant="destructive" className="max-w-md">
+      <AlertDescription>
+        Failed to load map: {error.message}
+      </AlertDescription>
+    </Alert>
+  </div>
+);
+
+// Loading component
+const MapLoading = () => (
+  <div className="h-full w-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+    <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+  </div>
+);
 
 // Main Map component
 const Map: React.FC<MapProps> = ({
@@ -169,25 +176,19 @@ const Map: React.FC<MapProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
+    // Simulate loading time to ensure map properly initializes
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, 1000); // Give map time to initialize
-
+    }, 800);
+    
     return () => clearTimeout(timer);
   }, []);
 
   if (error) {
-    return (
-      <div className="h-full w-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
-        <Alert variant="destructive" className="max-w-md">
-          <AlertDescription>
-            Failed to load map: {error.message}
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
+    return <MapError error={error} />;
   }
 
   if (isLoading) {
@@ -195,35 +196,27 @@ const Map: React.FC<MapProps> = ({
   }
 
   return (
-    <MapErrorBoundary>
-      <div className="h-full w-full">
-        <MapContainer 
-          center={center} 
-          zoom={12} 
-          style={{ height: '100%', width: '100%' }}
-          whenReady={() => setIsLoading(false)}
-        >
-          <MapController center={center} routes={routes} selectedRouteId={selectedRouteId} />
-          
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          
-          {startCoords && (
-            <Marker position={startCoords}>
-              <Popup>Starting Point</Popup>
-            </Marker>
-          )}
-          
-          {endCoords && (
-            <Marker position={endCoords}>
-              <Popup>Destination</Popup>
-            </Marker>
-          )}
-        </MapContainer>
-      </div>
-    </MapErrorBoundary>
+    <div className="h-full w-full">
+      <MapContainer 
+        center={center} 
+        zoom={12} 
+        style={{ height: '100%', width: '100%' }}
+        whenReady={() => setMapReady(true)}
+      >
+        {mapReady && (
+          <>
+            <MapController center={center} />
+            <MapRoutes routes={routes} selectedRouteId={selectedRouteId} />
+            <MapMarkers startCoords={startCoords} endCoords={endCoords} />
+          </>
+        )}
+        
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+      </MapContainer>
+    </div>
   );
 };
 
