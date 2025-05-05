@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { Bike, Bus, Car, User } from 'lucide-react';
 
 interface TransportModeSelectorProps {
   selectedMode: string;
@@ -12,10 +13,10 @@ const TransportModeSelector: React.FC<TransportModeSelectorProps> = ({
   onChange,
 }) => {
   const transportModes = [
-    { id: 'driving', label: 'Car', icon: '🚗', co2: 'High' },
-    { id: 'cycling', label: 'Bike', icon: '🚲', co2: 'Zero' },
-    { id: 'walking', label: 'Walk', icon: '🚶', co2: 'Zero' },
-    { id: 'transit', label: 'Transit', icon: '🚌', co2: 'Low' },
+    { id: 'driving', label: 'Car', icon: <Car className="h-6 w-6" />, co2: 'High' },
+    { id: 'cycling', label: 'Bike', icon: <Bike className="h-6 w-6" />, co2: 'Zero' },
+    { id: 'walking', label: 'Walk', icon: <User className="h-6 w-6" />, co2: 'Zero' },
+    { id: 'transit', label: 'Transit', icon: <Bus className="h-6 w-6" />, co2: 'Low' },
   ];
 
   return (
@@ -26,13 +27,13 @@ const TransportModeSelector: React.FC<TransportModeSelectorProps> = ({
           type="button"
           onClick={() => onChange(mode.id)}
           className={cn(
-            "flex flex-col items-center justify-center rounded-lg px-3 py-2 transition-all",
+            "flex flex-col items-center justify-center rounded-lg px-3 py-2 transition-all w-full sm:w-auto",
             selectedMode === mode.id
               ? "bg-green-100 text-green-900 border-2 border-green-500"
               : "bg-white hover:bg-green-50 text-gray-700 border border-gray-200"
           )}
         >
-          <span className="text-xl mb-1">{mode.icon}</span>
+          <span className="mb-1">{mode.icon}</span>
           <span className="text-sm font-medium">{mode.label}</span>
           <span 
             className={cn(
